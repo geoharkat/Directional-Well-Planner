@@ -1,0 +1,2360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Directional Well Planner</title>
+    <meta name="author" content="Ismail Harkat">
+    <meta name="description" content="Advanced Directional Well Planner — Trajectory Design, Pareto Solver, Formation Tops. Developed by Ismail Harkat.">
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        /* ============================================================
+           DESIGN TOKENS
+           ============================================================ */
+        :root{
+            --primary:#0f172a;
+            --primary-soft:#1e293b;
+            --accent:#0d9488;
+            --accent-hover:#0f766e;
+            --accent-2:#14b8a6;
+            --accent-bg:#f0fdfa;
+            --accent-border:#99f6e4;
+            --success:#059669;
+            --success-bg:#ecfdf5;
+            --danger:#dc2626;
+            --danger-bg:#fef2f2;
+            --warm:#ea580c;
+            --warm-bg:#fff7ed;
+            --warm-border:#fed7aa;
+            --fm-color:#7c3aed;
+            --fm-bg:#faf5ff;
+            --fm-border:#e9d5ff;
+            --bg:#f1f5f9;
+            --bg-subtle:#f8fafc;
+            --card-bg:#ffffff;
+            --border:#e2e8f0;
+            --border-strong:#cbd5e1;
+            --text:#1e293b;
+            --muted:#64748b;
+            --muted-2:#475569;
+            --shadow-sm:0 1px 2px rgba(15,23,42,.04), 0 1px 3px rgba(15,23,42,.06);
+            --shadow-md:0 2px 4px rgba(15,23,42,.04), 0 4px 10px rgba(15,23,42,.07);
+            --shadow-lg:0 4px 8px rgba(15,23,42,.06), 0 12px 24px rgba(15,23,42,.08);
+            --mk-kop:#ea580c;
+            --mk-eob:#059669;
+            --mk-eod:#2563eb;
+            --mk-eot:#0d9488;
+            --mk-sot:#f59e0b;
+            --mk-td:#dc2626;
+            --mk-sfc:#64748b;
+        }
+
+        *{box-sizing:border-box}
+        html,body{margin:0;padding:0}
+        body{
+            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+            background:var(--bg);
+            color:var(--text);
+            font-size:13px;
+            line-height:1.5;
+            -webkit-font-smoothing:antialiased;
+        }
+
+        /* ============================================================
+           APP HEADER
+           ============================================================ */
+        .header{
+            background:linear-gradient(180deg,#0f172a 0%,#1e293b 100%);
+            color:#fff;
+            padding:12px 24px;
+            box-shadow:var(--shadow-md);
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            flex-wrap:wrap;
+            gap:12px;
+            border-bottom:1px solid #0b1220;
+        }
+        .brand{display:flex;align-items:center;gap:12px}
+        .brand-mark{
+            width:32px;height:32px;border-radius:8px;
+            background:linear-gradient(135deg,var(--accent) 0%,var(--accent-2) 100%);
+            display:flex;align-items:center;justify-content:center;
+            font-weight:800;color:#fff;font-size:15px;letter-spacing:.5px;
+            box-shadow:0 2px 6px rgba(13,148,136,.35);
+        }
+        .brand-text{display:flex;flex-direction:column;line-height:1.15}
+        .brand-text h2{margin:0;font-size:16px;font-weight:700;letter-spacing:.2px}
+        .brand-text small{font-size:11px;color:#94a3b8;letter-spacing:.5px;text-transform:uppercase;font-weight:500}
+        .btn-group{display:flex;gap:8px;flex-wrap:wrap}
+
+        /* ============================================================
+           FOOTER
+           ============================================================ */
+        .footer{
+            background:linear-gradient(180deg,#1e293b 0%,#0f172a 100%);
+            color:#94a3b8;
+            padding:10px 24px;
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            flex-wrap:wrap;
+            gap:8px;
+            font-size:11.5px;
+            border-top:1px solid #334155;
+            flex-shrink:0;
+        }
+        .footer-left{display:flex;align-items:center;gap:6px}
+        .footer-left .copy-symbol{color:var(--accent-2);font-weight:700;font-size:13px}
+        .footer-left .author-name{color:#e2e8f0;font-weight:600}
+        .footer-center{
+            display:flex;align-items:center;gap:16px;
+            font-size:11px;
+        }
+        .footer-center a{
+            color:#5eead4;text-decoration:none;font-weight:500;
+            transition:color .15s;
+        }
+        .footer-center a:hover{color:#fff;text-decoration:underline}
+        .footer-center .separator{color:#475569}
+        .footer-right{display:flex;align-items:center;gap:8px;font-size:11px}
+        .footer-right .badge{
+            background:linear-gradient(135deg,var(--accent) 0%,var(--accent-hover) 100%);
+            color:#fff;padding:2px 8px;border-radius:4px;
+            font-size:10px;font-weight:700;letter-spacing:.03em;
+        }
+        .footer .fa-icon{
+            width:14px;height:14px;display:inline-block;vertical-align:middle;
+            margin-right:3px;
+        }
+
+        /* ============================================================
+           LAYOUT
+           ============================================================ */
+        .container{display:flex;height:calc(100vh - 57px - 40px)}
+        .sidebar{
+            width:440px;min-width:440px;
+            background:var(--card-bg);
+            padding:18px;
+            overflow-y:auto;
+            border-right:1px solid var(--border);
+            box-shadow:1px 0 3px rgba(15,23,42,.03);
+        }
+        .main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+        .plots-area{flex:1;padding:18px;display:flex;flex-direction:column;gap:16px;overflow-y:auto;min-height:0}
+
+        /* ============================================================
+           SECTION TITLES
+           ============================================================ */
+        .section-title{
+            position:relative;
+            font-size:11px;
+            font-weight:700;
+            color:var(--primary);
+            text-transform:uppercase;
+            letter-spacing:.08em;
+            padding:6px 0 6px 14px;
+            margin:22px 0 12px 0;
+            border-bottom:1px solid var(--border);
+        }
+        .section-title::before{
+            content:"";
+            position:absolute;left:0;top:50%;transform:translateY(-50%);
+            width:4px;height:18px;border-radius:3px;
+            background:var(--accent);
+        }
+        .section-title:first-child{margin-top:2px}
+
+        /* ============================================================
+           CARDS
+           ============================================================ */
+        .solver-box{
+            background:var(--accent-bg);
+            border:1px solid var(--accent-border);
+            border-radius:10px;
+            padding:14px;
+            margin-bottom:12px;
+            box-shadow:var(--shadow-sm);
+        }
+        .solver-box .form-group label{color:#115e59;font-weight:600}
+        .solver-results{
+            background:#fff;
+            border:1px solid var(--accent-border);
+            border-radius:8px;
+            padding:12px 14px;
+            margin-top:10px;
+            font-size:12.5px;
+            line-height:1.65;
+            box-shadow:var(--shadow-sm);
+        }
+        .solver-results .val{color:var(--danger);font-weight:700}
+        .solver-results .ok{color:var(--success);font-weight:700}
+        .solver-results .fail{color:var(--danger);font-weight:700}
+        .pareto-plot{background:#fff;border:1px solid var(--accent-border);border-radius:8px;margin-top:8px;height:170px}
+
+        .reach-slider-block{
+            background:#fff;border:1px solid var(--accent-border);
+            border-radius:8px;margin-top:10px;padding:10px 12px;
+        }
+        .reach-slider-block label{
+            font-size:11.5px;font-weight:600;color:#0f766e;
+            display:flex;justify-content:space-between;margin-bottom:6px;
+        }
+        .reach-slider-block label span.value{color:var(--danger);font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace}
+        .reach-slider-block input[type="range"]{width:100%;accent-color:var(--accent)}
+        .reach-marks{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px;font-weight:500}
+
+        .segment-card{
+            background:var(--card-bg);
+            border:1px solid var(--border);
+            border-radius:10px;
+            padding:14px;
+            margin-bottom:10px;
+            position:relative;
+            box-shadow:var(--shadow-sm);
+            transition:box-shadow .18s, border-color .18s;
+        }
+        .segment-card:hover{box-shadow:var(--shadow-md);border-color:var(--border-strong)}
+        .segment-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px}
+        .segment-header h3{margin:0;color:var(--primary);font-size:14px;font-weight:600;flex:1;display:flex;align-items:center;gap:8px}
+        .segment-header h3::before{
+            content:"";display:inline-block;width:8px;height:8px;border-radius:50%;
+            background:var(--accent);flex-shrink:0;
+        }
+        .segment-ctrls{display:flex;gap:4px;align-items:center}
+        .btn-toggle{
+            background:#e2e8f0;color:var(--primary-soft);
+            padding:4px 10px;font-size:12px;line-height:1;
+            border-radius:5px;cursor:pointer;border:none;
+            font-weight:700;min-width:30px;
+            transition:background .15s;
+        }
+        .btn-toggle:hover{background:#cbd5e1}
+        .segment-body.collapsed{display:none}
+        .segment-summary{font-size:11.5px;color:var(--muted);font-style:italic;margin-top:4px}
+        .formation-card{background:var(--fm-bg);border-color:var(--fm-border)}
+        .formation-card .segment-header h3{color:var(--fm-color)}
+        .formation-card .segment-header h3::before{background:var(--fm-color)}
+
+        /* ============================================================
+           FORMS
+           ============================================================ */
+        .form-group{margin-bottom:10px}
+        .form-group label{
+            display:block;font-size:11.5px;font-weight:600;
+            margin-bottom:4px;color:var(--muted-2);letter-spacing:.02em;
+        }
+        .form-group input,.form-group select{
+            width:100%;padding:8px 10px;
+            border:1px solid var(--border-strong);
+            border-radius:6px;font-size:13px;
+            background:#fff;color:var(--text);
+            transition:border-color .15s, box-shadow .15s;
+            font-family:inherit;
+        }
+        .form-group input:hover,.form-group select:hover{border-color:var(--muted)}
+        .form-group input:focus,.form-group select:focus{
+            border-color:var(--accent);outline:none;
+            box-shadow:0 0 0 3px rgba(13,148,136,.15);
+        }
+        .form-group input[type="number"]{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:12.5px}
+        .form-row{display:flex;gap:10px}
+        .form-row .form-group{flex:1}
+
+        /* ============================================================
+           BUTTONS
+           ============================================================ */
+        .btn{
+            padding:8px 14px;border:none;border-radius:6px;
+            cursor:pointer;font-weight:600;font-size:12.5px;
+            margin-right:4px;margin-bottom:4px;
+            transition:background .15s, box-shadow .15s, transform .05s;
+            letter-spacing:.01em;
+            font-family:inherit;
+            box-shadow:var(--shadow-sm);
+        }
+        .btn:hover{box-shadow:var(--shadow-md)}
+        .btn:active{transform:translateY(1px);box-shadow:var(--shadow-sm)}
+        .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+        .btn-primary{background:var(--accent);color:#fff}
+        .btn-primary:hover{background:var(--accent-hover)}
+        .btn-danger{background:var(--danger);color:#fff}
+        .btn-danger:hover{background:#b91c1c}
+        .btn-success{background:var(--success);color:#fff}
+        .btn-success:hover{background:#047857}
+        .btn-export{background:#4f46e5;color:#fff}
+        .btn-export:hover{background:#4338ca}
+        .btn-formation{background:var(--fm-color);color:#fff}
+        .btn-formation:hover{background:#6d28d9}
+        .btn-solver{
+            background:linear-gradient(135deg,var(--accent) 0%,var(--accent-hover) 100%);
+            color:#fff;font-size:13px;padding:11px;font-weight:700;
+            letter-spacing:.02em;
+        }
+        .btn-solver:hover{background:linear-gradient(135deg,var(--accent-hover) 0%,#115e59 100%)}
+
+        /* ============================================================
+           TOGGLE / SLIDER ROWS
+           ============================================================ */
+        .toggle-row{
+            display:flex;align-items:center;gap:10px;
+            background:var(--fm-bg);border:1px solid var(--fm-border);
+            border-radius:6px;padding:8px 12px;margin-top:8px;
+            font-size:12px;
+        }
+        .toggle-row input{accent-color:var(--fm-color);cursor:pointer;width:15px;height:15px}
+        .toggle-row label{color:var(--primary-soft);font-weight:500}
+
+        .slider-block{
+            background:var(--bg-subtle);border:1px solid var(--border);
+            border-radius:8px;padding:10px 12px;margin-bottom:10px;
+        }
+        .slider-block label{
+            font-size:12px;font-weight:600;color:var(--muted-2);
+            display:flex;justify-content:space-between;margin-bottom:6px;
+        }
+        .slider-block label span.value{color:var(--accent);font-weight:700;font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace}
+        .slider-block input[type="range"]{width:100%;accent-color:var(--accent)}
+        .slider-row{display:flex;gap:8px;align-items:center;margin-top:6px}
+        .slider-row input[type="number"]{width:80px;padding:5px 8px;font-size:12px}
+
+        /* ============================================================
+           EOB READOUT
+           ============================================================ */
+        .eob-readout{
+            background:var(--accent-bg);
+            border-left:3px solid var(--accent);
+            padding:10px 12px;margin-top:8px;
+            font-size:12px;border-radius:0 6px 6px 0;
+            line-height:1.7;
+        }
+        .eob-readout b{color:var(--primary)}
+        .eob-readout .val{color:var(--danger);font-weight:700;font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace}
+
+        /* ============================================================
+           DLS PROFILE
+           ============================================================ */
+        .dls-profile{
+            background:var(--warm-bg);
+            border:1px dashed var(--warm-border);
+            border-radius:8px;padding:10px 12px;margin-top:8px;font-size:12px;
+        }
+        .dls-profile-toggle{
+            display:flex;align-items:center;gap:8px;
+            font-weight:700;color:var(--warm);
+            cursor:pointer;user-select:none;font-size:12px;
+        }
+        .dls-profile-toggle input{accent-color:var(--warm);cursor:pointer;width:15px;height:15px}
+        .dls-profile-body{margin-top:10px;padding-top:8px;border-top:1px dashed var(--warm-border);display:none}
+        .dls-profile-body.open{display:block}
+        .dls-profile-body .form-group{margin-bottom:6px}
+        .dls-profile-body .form-group label{font-size:11px;color:#9a3412}
+        .dls-profile-body .form-group input{padding:5px 8px;font-size:12px}
+        .dls-profile-body .note{
+            color:#9a3412;font-size:11px;display:block;margin-top:8px;
+            line-height:1.5;font-style:italic;
+        }
+        .dls-profile-body .metrics{
+            display:flex;gap:14px;margin-top:8px;padding:8px 10px;
+            background:#ffedd5;border-radius:5px;font-size:11.5px;flex-wrap:wrap;
+        }
+        .dls-profile-body .metrics span{color:#9a3412}
+        .dls-profile-body .metrics b{color:#7c2d12;font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace}
+
+        /* ============================================================
+           PLOTS
+           ============================================================ */
+        .plot-container{
+            background:var(--card-bg);
+            border-radius:10px;
+            box-shadow:var(--shadow-sm);
+            padding:10px;
+            min-height:380px;
+            border:1px solid var(--border);
+        }
+        .plot-header{
+            display:flex;justify-content:space-between;align-items:center;
+            margin-bottom:8px;padding:0 4px;
+        }
+        .plot-header h3{
+            margin:0;font-size:13px;color:var(--primary);
+            font-weight:600;letter-spacing:.01em;
+        }
+        .plot-header .btn{margin:0;padding:5px 10px;font-size:11px;font-weight:600}
+
+        /* ============================================================
+           TABLE AREA
+           ============================================================ */
+        .table-container{
+            height:36vh;min-height:260px;
+            background:var(--card-bg);
+            box-shadow:0 -2px 12px rgba(15,23,42,.06);
+            overflow:auto;
+            border-top:2px solid var(--accent);
+            flex-shrink:0;
+        }
+        .table-header{
+            position:sticky;top:0;z-index:3;
+            background:var(--primary);color:#fff;
+            padding:9px 18px;font-size:12px;
+            display:flex;align-items:center;gap:18px;
+            box-shadow:0 1px 3px rgba(0,0,0,.25);
+        }
+        .table-title{font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:11.5px}
+        .table-controls{display:flex;align-items:center;gap:8px;padding:0 14px;border-left:1px solid rgba(255,255,255,.14);border-right:1px solid rgba(255,255,255,.14)}
+        .table-controls label{font-size:11px;color:#cbd5e1;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+        .table-controls select{
+            background:#1e293b;color:#fff;
+            border:1px solid #334155;border-radius:5px;
+            padding:4px 10px;font-size:12px;font-weight:600;
+            cursor:pointer;font-family:inherit;
+            transition:border-color .15s, background .15s;
+        }
+        .table-controls select:hover{border-color:var(--accent-2);background:#0f172a}
+        .table-controls select:focus{outline:none;border-color:var(--accent-2);box-shadow:0 0 0 2px rgba(20,184,166,.25)}
+        .table-info{font-weight:400;font-size:11.5px;color:#cbd5e1;flex:1;font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace}
+
+        table{width:100%;border-collapse:collapse;font-size:12px}
+        thead th{
+            background:var(--primary-soft);color:#fff;
+            padding:9px 8px;
+            position:sticky;top:39px;z-index:2;
+            font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;
+            font-weight:600;text-align:right;
+            border-bottom:2px solid #0f172a;
+        }
+        thead th:first-child{text-align:left;padding-left:18px}
+        tbody td{
+            padding:7px 8px;text-align:right;
+            font-size:12px;
+            font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+            border-bottom:1px solid var(--border);
+            color:var(--text);
+        }
+        tbody td:first-child{text-align:left;padding-left:18px;font-family:inherit;font-weight:600}
+        tbody tr:nth-child(even) td{background:var(--bg-subtle)}
+        tbody tr:hover td{background:var(--accent-bg)}
+
+        .marker{
+            display:inline-block;
+            padding:2px 8px;border-radius:4px;
+            font-size:10px;font-weight:700;
+            letter-spacing:.05em;color:#fff;
+            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+        }
+        .marker-fm{background:var(--fm-color)}
+        .marker-kop{background:var(--mk-kop)}
+        .marker-eob{background:var(--mk-eob)}
+        .marker-eod{background:var(--mk-eod)}
+        .marker-eot{background:var(--mk-eot)}
+        .marker-sot{background:var(--mk-sot)}
+        .marker-td{background:var(--mk-td)}
+        .marker-surface{background:var(--mk-sfc)}
+        tr.fm-row td{background:var(--fm-bg) !important;font-weight:600}
+        tr.fm-row:hover td{background:#f3e8ff !important}
+
+        /* ============================================================
+           MISC CARDS
+           ============================================================ */
+        .vsaz-box{
+            background:#fffbeb;border:1px solid #fde68a;
+            border-radius:8px;padding:12px;margin-bottom:10px;
+        }
+        .vsaz-box small{color:#92400e;display:block;margin-top:6px;font-size:11px;line-height:1.5}
+
+        .well-name-block{
+            background:#fff;border:1px solid var(--border);
+            border-radius:8px;padding:10px 12px;margin-bottom:10px;
+            display:flex;align-items:center;gap:12px;
+            box-shadow:var(--shadow-sm);
+        }
+        .well-name-block label{
+            font-size:10.5px;font-weight:700;color:var(--accent);
+            white-space:nowrap;text-transform:uppercase;letter-spacing:.06em;
+        }
+        .well-name-block input{
+            flex:1;padding:7px 10px;
+            border:1px solid var(--border-strong);border-radius:5px;
+            font-size:13px;font-weight:600;color:var(--primary);
+            background:#fff;font-family:inherit;
+            transition:border-color .15s, box-shadow .15s;
+        }
+        .well-name-block input:focus{
+            outline:none;border-color:var(--accent);
+            box-shadow:0 0 0 3px rgba(13,148,136,.15);
+        }
+        .ann-help{font-size:11px;color:var(--muted);margin:0 0 8px 2px;line-height:1.5}
+
+        .ann-table{
+            width:100%;font-size:12px;border-collapse:collapse;
+            background:#fff;border:1px solid var(--border);
+            border-radius:8px;overflow:hidden;
+            box-shadow:var(--shadow-sm);
+        }
+        .ann-table th{
+            background:var(--primary-soft);color:#fff;
+            padding:8px 6px;font-size:10.5px;font-weight:600;
+            text-align:center;letter-spacing:.05em;text-transform:uppercase;
+        }
+        .ann-table td{padding:7px 10px;border-top:1px solid var(--border);text-align:center}
+        .ann-table td:first-child{text-align:left;font-weight:600;color:var(--primary-soft);font-size:12px}
+        .ann-table tbody tr:hover td{background:var(--bg-subtle)}
+        .ann-table input[type="checkbox"]{accent-color:var(--accent);cursor:pointer;width:16px;height:16px}
+        .ann-table input[type="checkbox"]:disabled{opacity:.25;cursor:not-allowed}
+        .ann-table .row-accent{
+            width:4px;height:14px;display:inline-block;
+            border-radius:2px;margin-right:8px;vertical-align:middle;
+        }
+
+        .collapse-all-row{display:flex;gap:6px;margin-bottom:10px}
+        .collapse-all-row .btn{
+            flex:1;margin:0;background:#e2e8f0;color:var(--primary-soft);
+            padding:6px 10px;font-size:11px;font-weight:600;box-shadow:none;
+        }
+        .collapse-all-row .btn:hover{background:#cbd5e1;box-shadow:var(--shadow-sm)}
+
+        /* ============================================================
+           SIDEBAR FOOTER (about / contact block)
+           ============================================================ */
+        .sidebar-footer{
+            margin-top:24px;
+            padding:16px;
+            background:linear-gradient(135deg,#f0fdfa 0%,#f8fafc 100%);
+            border:1px solid var(--accent-border);
+            border-radius:10px;
+            font-size:12px;
+            line-height:1.65;
+        }
+        .sidebar-footer .sf-title{
+            font-weight:700;font-size:13px;color:var(--primary);
+            margin-bottom:6px;display:flex;align-items:center;gap:8px;
+        }
+        .sidebar-footer .sf-title::before{
+            content:"";display:inline-block;width:4px;height:16px;
+            border-radius:2px;background:var(--accent);
+        }
+        .sidebar-footer .sf-row{
+            display:flex;align-items:center;gap:8px;
+            color:var(--muted-2);margin-top:4px;
+        }
+        .sidebar-footer .sf-row strong{color:var(--primary-soft)}
+        .sidebar-footer a{
+            color:var(--accent);text-decoration:none;font-weight:600;
+            transition:color .15s;
+        }
+        .sidebar-footer a:hover{color:var(--accent-hover);text-decoration:underline}
+        .sidebar-footer .sf-copy{
+            margin-top:10px;padding-top:8px;
+            border-top:1px solid var(--border);
+            font-size:10.5px;color:var(--muted);
+        }
+
+        /* ============================================================
+           SCROLLBARS
+           ============================================================ */
+        .sidebar::-webkit-scrollbar,
+        .plots-area::-webkit-scrollbar,
+        .table-container::-webkit-scrollbar{width:10px;height:10px}
+        .sidebar::-webkit-scrollbar-thumb,
+        .plots-area::-webkit-scrollbar-thumb,
+        .table-container::-webkit-scrollbar-thumb{
+            background:#cbd5e1;border-radius:10px;border:2px solid transparent;background-clip:padding-box;
+        }
+        .sidebar::-webkit-scrollbar-thumb:hover,
+        .plots-area::-webkit-scrollbar-thumb:hover,
+        .table-container::-webkit-scrollbar-thumb:hover{background:#94a3b8;background-clip:padding-box}
+        .sidebar::-webkit-scrollbar-track,
+        .plots-area::-webkit-scrollbar-track,
+        .table-container::-webkit-scrollbar-track{background:transparent}
+
+        /* ============================================================
+           RESPONSIVE
+           ============================================================ */
+        @media(max-width:1100px){
+            .container{flex-direction:column;height:auto}
+            .sidebar{width:100%;min-width:unset;max-height:60vh;border-right:none;border-bottom:1px solid var(--border)}
+            .main{height:auto}
+            .table-container{height:auto;max-height:50vh}
+            .table-header{flex-wrap:wrap;gap:10px}
+            .table-controls{padding:0 8px}
+            .table-info{flex-basis:100%;order:3}
+            .footer{flex-direction:column;text-align:center;gap:6px}
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="brand">
+        <div class="brand-mark">WP</div>
+        <div class="brand-text">
+            <h2>Directional Well Planner</h2>
+            <small>Trajectory &middot; Pareto Solver &middot; Formation Tops</small>
+        </div>
+    </div>
+    <div class="btn-group">
+        <button class="btn btn-export" onclick="exportExcel()">Export Excel</button>
+        <button class="btn btn-export" onclick="exportPDF()">Export PDF Report</button>
+    </div>
+</div>
+
+<div class="container">
+    <div class="sidebar">
+
+        <div class="section-title" style="margin-top:4px">Target Solver — Min DLS / Max Reach</div>
+        <div class="solver-box">
+            <div class="form-row">
+                <div class="form-group"><label>KOP MD (m)</label><input type="number" id="solverKOP" value="500" step="1"></div>
+                <div class="form-group"><label>Azimuth (deg)</label><input type="number" id="solverAzi" value="45" step="0.1"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Top Target (EOB TVD, m)</label><input type="number" id="solverEobTvd" value="2000" step="1"></div>
+                <div class="form-group"><label>Bottom Target (TD TVD, m)</label><input type="number" id="solverTdTvd" value="2500" step="1"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Target Inclination at EOB (&deg;) <span style="font-weight:400;color:#555">&mdash; optional</span></label>
+                    <input type="number" id="solverTargetAlpha" value="" step="0.1" min="0.1" max="90" placeholder="e.g. 90 for L-type">
+                </div>
+                <div class="form-group">
+                    <label>Target H-Departure at TD (m) <span style="font-weight:400;color:#555">&mdash; optional</span></label>
+                    <input type="number" id="solverTargetH" value="" step="1" placeholder="alternative to &alpha;">
+                </div>
+            </div>
+            <div id="solver-feasibility" style="font-size:11px;color:#004d40;margin:-2px 0 8px 2px"></div>
+            <button class="btn btn-solver" onclick="solveAndGenerate()" style="width:100%">Compute &amp; Generate</button>
+            <div id="solver-results"></div>
+            <div id="paretoPlot" class="pareto-plot" style="display:none"></div>
+            <div id="reachSliderBlock" class="reach-slider-block" style="display:none">
+                <label>Reach Bias <span class="value" id="reachVal">knee</span></label>
+                <input type="range" id="reachSlider" min="0" max="100" step="0.5" value="50" oninput="onReachSlider(this.value)">
+                <div class="reach-marks"><span>min DLS</span><span>knee</span><span>max reach</span></div>
+            </div>
+        </div>
+
+        <div class="section-title">Wellbore Segments</div>
+        <div style="margin-bottom:8px;">
+            <button class="btn btn-primary" onclick="addSegment('vertical')">+ Vertical</button>
+            <button class="btn btn-primary" onclick="addSegment('build')">+ Build</button>
+            <button class="btn btn-primary" onclick="addSegment('drop')">+ Drop</button>
+            <button class="btn btn-primary" onclick="addSegment('turn')">+ Turn</button>
+            <button class="btn btn-primary" onclick="addSegment('hold')">+ Hold</button>
+        </div>
+        <div class="collapse-all-row">
+            <button class="btn" onclick="collapseAllSegments(true)">Collapse All &#9656;</button>
+            <button class="btn" onclick="collapseAllSegments(false)">Expand All &#9662;</button>
+        </div>
+        <button class="btn btn-success" onclick="calculateAndPlot()" style="width:100%;padding:10px;font-size:13px">Calculate &amp; Plot Well</button>
+        <button class="btn btn-danger" onclick="clearAll()" style="width:100%;margin-top:6px">Clear All</button>
+        <div id="segments-container" style="margin-top:14px"></div>
+
+        <div class="section-title">Vertical Section Azimuth</div>
+        <div class="vsaz-box">
+            <div class="form-row">
+                <div class="form-group" style="margin-bottom:0"><label>VS Azimuth (deg)</label><input type="number" id="vsAzimuth" value="45" step="0.1" onchange="calculateAndPlot()"></div>
+                <div class="form-group" style="margin-bottom:0;display:flex;align-items:flex-end"><button class="btn btn-primary" style="margin:0;width:100%" onclick="autoSetVsAzimuth()">Auto (Target)</button></div>
+            </div>
+            <small>Used for Vertical Section projection and apparent-dip of formations.</small>
+        </div>
+
+        <div class="section-title">Formation Tops</div>
+        <button class="btn btn-formation" onclick="addFormation()" style="width:100%">+ Add Formation Top</button>
+        <div class="toggle-row">
+            <input type="checkbox" id="fillToggle" checked onchange="calculateAndPlot()">
+            <label for="fillToggle" style="margin:0;cursor:pointer">Show volume fill between formation tops (VS &amp; 3D)</label>
+        </div>
+        <div id="formations-container" style="margin-top:10px"></div>
+
+        <div class="section-title">Well Name &amp; Annotation Display</div>
+        <div class="well-name-block">
+            <label>Well Name</label>
+            <input type="text" id="wellName" value="our well" oninput="onWellNameInput(this.value)">
+        </div>
+        <div class="ann-help">Toggle which annotations appear on each plot. Settings apply to both interactive plots and the PDF report.</div>
+        <table class="ann-table" id="annTable">
+            <thead>
+                <tr><th style="text-align:left;padding-left:10px">Marker</th><th>Plan</th><th>VS</th><th>3D</th></tr>
+            </thead>
+            <tbody id="annTableBody"></tbody>
+        </table>
+
+        <!-- ============================================================
+             SIDEBAR FOOTER — About / Contact
+             ============================================================ -->
+        <div class="sidebar-footer">
+            <div class="sf-title">About This Tool</div>
+            <div class="sf-row">
+                <strong>Developed by</strong>&nbsp; Ismail Harkat
+            </div>
+            <div class="sf-row">
+                <strong>Contact</strong>&nbsp;
+                <a href="mailto:geoharkat@gmail.com">geoharkat@gmail.com</a>
+            </div>
+            <div class="sf-row">
+                <strong>License</strong>&nbsp;
+                <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener noreferrer">MIT License</a>
+                &mdash; free to use, modify, and distribute.
+            </div>
+            <div class="sf-copy">
+                &copy; <span id="copyYear"></span> Ismail Harkat. All rights reserved.<br>
+                Built for the drilling engineering community.
+            </div>
+        </div>
+
+    </div>
+
+    <div class="main">
+        <div class="plots-area">
+            <div style="display:flex;gap:16px;flex-wrap:wrap">
+                <div style="flex:1;min-width:280px">
+                    <div class="plot-header"><h3>Plan View (North vs East)</h3><button class="btn btn-export" onclick="exportPlot('plot2dPlan','Plan_View')">PNG</button></div>
+                    <div id="plot2dPlan" class="plot-container" style="height:420px"></div>
+                </div>
+                <div style="flex:1;min-width:280px">
+                    <div class="plot-header"><h3>Vertical Section (TVD vs VS-Departure)</h3><button class="btn btn-export" onclick="exportPlot('plot2dVS','Vertical_Section')">PNG</button></div>
+                    <div id="plot2dVS" class="plot-container" style="height:420px"></div>
+                </div>
+            </div>
+            <div>
+                <div class="plot-header"><h3>3D Well Path</h3><button class="btn btn-export" onclick="exportPlot('plot3d','3D_Well_Path')">PNG</button></div>
+                <div id="plot3d" class="plot-container" style="height:520px"></div>
+            </div>
+        </div>
+        <div class="table-container">
+            <div class="table-header">
+                <span class="table-title">Survey Table</span>
+                <div class="table-controls">
+                    <label for="mdStepSelect">MD step</label>
+                    <select id="mdStepSelect" onchange="onMdStepChange(this.value)">
+                        <option value="5">5 m</option>
+                        <option value="10" selected>10 m</option>
+                        <option value="20">20 m</option>
+                        <option value="30">30 m</option>
+                        <option value="0">Raw stations</option>
+                    </select>
+                </div>
+                <span id="tableInfo" class="table-info"></span>
+            </div>
+            <div id="survey-table"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     FOOTER BAR
+     ============================================================ -->
+<footer class="footer">
+    <div class="footer-left">
+        <span class="copy-symbol">&copy;</span>
+        <span class="author-name">Ismail Harkat</span>
+        <span>&mdash; Directional Well Planner</span>
+    </div>
+    <div class="footer-center">
+        <a href="mailto:geoharkat@gmail.com">geoharkat@gmail.com</a>
+        <span class="separator">|</span>
+        <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener noreferrer">MIT License</a>
+        <span class="separator">|</span>
+        <span id="footerYear"></span>
+    </div>
+    <div class="footer-right">
+        <span class="badge">v1.0</span>
+        <span>Built for drilling engineers</span>
+    </div>
+</footer>
+
+<script>
+/* =============  GLOBAL STATE  ============= */
+let segments = [];
+let segmentIdCounter = 0;
+let formations = [];
+let formationIdCounter = 0;
+let lastCalcResults = [];
+let lastVsAz = 0;
+let sliderUpdateTimer = null;
+let formationNameTimer = null;
+let plotRevision = 0;
+let lastPareto = null;
+let currentSolution = null;
+let segmentCollapsed = {};
+let wellName = "our well";
+let mdStep = 10;
+const degToRad = Math.PI / 180;
+const radToDeg = 180 / Math.PI;
+
+let reportOptions = {
+    plan: { KOP:false, EOB:false, EOD:false, SOT:true,  EOT:true,  TD:true,  formations:false, wellhead:true  },
+    vs:   { KOP:true,  EOB:true,  EOD:true,  SOT:true,  EOT:true,  TD:true,  formations:true,  wellhead:false },
+    d3:   { KOP:true,  EOB:true,  EOD:true,  SOT:true,  EOT:true,  TD:true,  formations:true,  wellhead:false }
+};
+const ANN_MARKERS = [
+    { key:'KOP',        label:'KOP',            color:'#e67e22' },
+    { key:'EOB',        label:'EOB',            color:'#27ae60' },
+    { key:'EOD',        label:'EOD',            color:'#2980b9' },
+    { key:'SOT',        label:'SOT',            color:'#f39c12' },
+    { key:'EOT',        label:'EOT',            color:'#16a085' },
+    { key:'TD',         label:'TD',             color:'#c0392b' },
+    { key:'formations', label:'Formation tops', color:'#8e44ad' },
+    { key:'wellhead',   label:'Wellhead ★',     color:'#c0392b' }
+];
+
+/* =============  PARETO SOLVER  ============= */
+function buildParetoCurve(kop, eobTvd, tdTvd) {
+    if (eobTvd <= kop)     return null;
+    if (tdTvd  <  eobTvd)  return null;
+    const points = [];
+    for (let aDeg = 0.5; aDeg <= 89.5; aDeg += 0.25) {
+        const a = aDeg * degToRad;
+        const R = Math.sin(a) / (eobTvd - kop);
+        const dls = R * 30 * radToDeg;
+        const hBuild = (eobTvd - kop) * Math.tan(a / 2);
+        const hHold  = (tdTvd  - eobTvd) * Math.tan(a);
+        const hTotal = hBuild + hHold;
+        const arc    = aDeg / dls * 30;
+        const lHold  = (tdTvd - eobTvd) / Math.cos(a);
+        points.push({ alpha: aDeg, R, dls, hBuild, hHold, hTotal, lHold, arc });
+    }
+    const p0 = points[0], pN = points[points.length - 1];
+    let maxDist = -Infinity, kneeIdx = 0;
+    for (let i = 1; i < points.length - 1; i++) {
+        const p = points[i];
+        const cross = (p.dls - p0.dls) * (pN.hTotal - p0.hTotal)
+                    - (p.hTotal - p0.hTotal) * (pN.dls - p0.dls);
+        if (cross > maxDist) { maxDist = cross; kneeIdx = i; }
+    }
+    return { points, kneeIdx };
+}
+
+function solutionFromAlpha(alphaDeg, kop, eobTvd, tdTvd) {
+    const a = alphaDeg * degToRad;
+    const R = Math.sin(a) / (eobTvd - kop);
+    const dls = R * 30 * radToDeg;
+    const hBuild = (eobTvd - kop) * Math.tan(a / 2);
+    const hHold  = (tdTvd  - eobTvd) * Math.tan(a);
+    const hTotal = hBuild + hHold;
+    const arc    = alphaDeg / dls * 30;
+    const lHold  = (tdTvd - eobTvd) / Math.cos(a);
+    return { alpha: alphaDeg, R, dls, hBuild, hHold, hTotal, lHold, arc };
+}
+
+function findAlphaForTargetH(targetH, kop, eobTvd, tdTvd) {
+    const f = a => {
+        const r = a * degToRad;
+        return (eobTvd-kop)*Math.tan(r/2) + (tdTvd-eobTvd)*Math.tan(r);
+    };
+    const hMin = f(0.001), hMax = f(89.5);
+    if (targetH < hMin || targetH > hMax) return null;
+    let lo = 0.001, hi = 89.5;
+    for (let i = 0; i < 60; i++) {
+        const mid = (lo + hi) / 2;
+        if (f(mid) < targetH) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+}
+
+function nearestParetoIdx(alphaDeg) {
+    if (!lastPareto) return 0;
+    const pts = lastPareto.points;
+    let best = 0, bestErr = Infinity;
+    for (let i = 0; i < pts.length; i++) {
+        const e = Math.abs(pts[i].alpha - alphaDeg);
+        if (e < bestErr) { bestErr = e; best = i; }
+    }
+    return best;
+}
+
+function solveAndGenerate() {
+    const kop        = parseFloat(document.getElementById('solverKOP').value)     || 500;
+    const eobTvd     = parseFloat(document.getElementById('solverEobTvd').value)  || 2000;
+    const tdTvd      = parseFloat(document.getElementById('solverTdTvd').value)   || 2500;
+    const azi        = parseFloat(document.getElementById('solverAzi').value)     || 0;
+    const targetARaw = document.getElementById('solverTargetAlpha').value.trim();
+    const targetHRaw = document.getElementById('solverTargetH').value.trim();
+    const targetA    = targetARaw === '' ? null : parseFloat(targetARaw);
+    const targetH    = targetHRaw === '' ? null : parseFloat(targetHRaw);
+
+    if (eobTvd <= kop) {
+        document.getElementById('solver-results').innerHTML =
+            '<div class="solver-results"><span class="fail">EOB TVD must be deeper than KOP.</span></div>';
+        return;
+    }
+    if (tdTvd < eobTvd) {
+        document.getElementById('solver-results').innerHTML =
+            '<div class="solver-results"><span class="fail">TD TVD must be ≥ EOB TVD.</span></div>';
+        return;
+    }
+
+    const pareto = buildParetoCurve(kop, eobTvd, tdTvd);
+    if (!pareto) {
+        document.getElementById('solver-results').innerHTML =
+            '<div class="solver-results"><span class="fail">No Pareto curve could be built.</span></div>';
+        return;
+    }
+    lastPareto = { ...pareto, kop, eobTvd, tdTvd, azi };
+
+    const hMin = pareto.points[0].hTotal;
+    const hMax = pareto.points[pareto.points.length-1].hTotal;
+    document.getElementById('solver-feasibility').textContent =
+        `Feasible H-Dep range for this geometry: ${hMin.toFixed(0)} – ${hMax.toFixed(0)} m`;
+
+    document.getElementById('reachSliderBlock').style.display = 'block';
+    document.getElementById('paretoPlot').style.display = 'block';
+
+    if (targetA !== null && !isNaN(targetA)) {
+        if (targetA <= 0 || targetA > 90) {
+            document.getElementById('solver-results').innerHTML =
+              `<div class="solver-results"><span class="fail">
+                Target inclination must be in (0°, 90°].</span></div>`;
+            document.getElementById('reachSliderBlock').style.display = 'none';
+            document.getElementById('paretoPlot').style.display = 'none';
+            return;
+        }
+        if (targetA >= 90 - 1e-9 && tdTvd > eobTvd + 1e-9) {
+            document.getElementById('solver-results').innerHTML =
+              `<div class="solver-results"><span class="fail">
+                Cannot hold at 90° with TD TVD deeper than EOB TVD
+                (horizontal can't gain TVD).</span><br>
+                Set TD TVD = EOB TVD for a pure build-and-land well,
+                or reduce target inclination below 90°.</div>`;
+            document.getElementById('reachSliderBlock').style.display = 'none';
+            document.getElementById('paretoPlot').style.display = 'none';
+            return;
+        }
+        if (targetH !== null && !isNaN(targetH) && targetH > 0) {
+            console.warn('Both target α and target H-Dep provided; α takes precedence.');
+        }
+        const sol = solutionFromAlpha(targetA, kop, eobTvd, tdTvd);
+        const idx = nearestParetoIdx(targetA);
+        const pct = 100 * idx / (pareto.points.length - 1);
+        document.getElementById('reachSlider').value = pct;
+        document.getElementById('reachVal').textContent = `α target: ${targetA.toFixed(1)}°`;
+        applyExactSolution(sol, idx, 'targetA', targetA);
+        return;
+    }
+
+    if (targetH !== null && !isNaN(targetH) && targetH > 0) {
+        if (targetH < hMin || targetH > hMax) {
+            document.getElementById('solver-results').innerHTML =
+              `<div class="solver-results"><span class="fail">
+                Target H-Dep ${targetH.toFixed(0)} m is outside feasible range
+                [${hMin.toFixed(0)}, ${hMax.toFixed(0)}] m.</span><br>
+                Adjust KOP, EOB TVD, or TD TVD to widen the range.</div>`;
+            document.getElementById('reachSliderBlock').style.display = 'none';
+            document.getElementById('paretoPlot').style.display = 'none';
+            return;
+        }
+        const alpha = findAlphaForTargetH(targetH, kop, eobTvd, tdTvd);
+        const sol = solutionFromAlpha(alpha, kop, eobTvd, tdTvd);
+        const idx = nearestParetoIdx(alpha);
+        const pct = 100 * idx / (pareto.points.length - 1);
+        document.getElementById('reachSlider').value = pct;
+        document.getElementById('reachVal').textContent = `H-Dep target: ${targetH.toFixed(0)} m`;
+        applyExactSolution(sol, idx, 'targetH', targetH);
+        return;
+    }
+
+    const kneePct = 100 * pareto.kneeIdx / (pareto.points.length - 1);
+    document.getElementById('reachSlider').value = kneePct;
+    document.getElementById('reachVal').textContent = 'knee';
+    applyReachSelection(pareto.kneeIdx, true);
+}
+
+function applyExactSolution(sol, nearestIdx, mode, targetVal) {
+    currentSolution = sol;
+    let tag;
+    if (mode === 'targetA') {
+        tag = `<span class="ok">Target Inclination mode (α = ${targetVal.toFixed(2)}°)</span>`;
+    } else if (mode === 'targetH') {
+        tag = `<span class="ok">Target H-Dep mode (H = ${targetVal.toFixed(1)} m)</span>`;
+    } else {
+        tag = '<span class="ok">Exact solution</span>';
+    }
+    document.getElementById('solver-results').innerHTML = `<div class="solver-results">
+        ${tag}<br>
+        Inclination at EOB: <span class="val">${sol.alpha.toFixed(2)} deg</span><br>
+        Build Rate (DLS): <span class="val">${sol.dls.toFixed(3)} deg/30m</span><br>
+        Hold Length: <span class="val">${sol.lHold.toFixed(2)} m</span><br>
+        Horizontal Departure at TD: <span class="val">${sol.hTotal.toFixed(2)} m</span><br>
+        <small>H build = ${sol.hBuild.toFixed(1)} m &nbsp;|&nbsp; H hold = ${sol.hHold.toFixed(1)} m<br>
+        Build arc length = ${sol.arc.toFixed(1)} m</small>
+        ${buildSolverTooltips(sol)}
+    </div>`;
+    drawParetoPlot(nearestIdx, sol);
+    rebuildSegmentsFromSolution(sol);
+}
+
+function applyReachSelection(idx, isKnee) {
+    if (!lastPareto) return;
+    const sol = lastPareto.points[idx];
+    currentSolution = sol;
+    const tag = isKnee ? '<span class="ok">Knee Point (auto-balanced)</span>' :
+                         '<span class="ok">Custom Selection</span>';
+    document.getElementById('solver-results').innerHTML = `<div class="solver-results">
+        ${tag}<br>
+        Inclination at EOB: <span class="val">${sol.alpha.toFixed(2)} deg</span><br>
+        Build Rate (DLS): <span class="val">${sol.dls.toFixed(3)} deg/30m</span><br>
+        Hold Length: <span class="val">${sol.lHold.toFixed(2)} m</span><br>
+        Horizontal Departure at TD: <span class="val">${sol.hTotal.toFixed(2)} m</span><br>
+        <small>H build = ${sol.hBuild.toFixed(1)} m &nbsp;|&nbsp; H hold = ${sol.hHold.toFixed(1)} m<br>
+        Build arc length = ${sol.arc.toFixed(1)} m</small>
+        ${buildSolverTooltips(sol)}
+    </div>`;
+    drawParetoPlot(idx);
+    rebuildSegmentsFromSolution(sol);
+}
+
+function buildSolverTooltips(sol) {
+    const dlsOk = sol.dls <= 12;
+    const dlsWarn = sol.dls > 12 && sol.dls <= 25;
+    const dlsHigh = sol.dls > 25;
+    let flag = '';
+    if (dlsOk)   flag = '<span style="color:#2e7d32;font-weight:700">easily drillable</span>';
+    else if (dlsWarn) flag = '<span style="color:#ef6c00;font-weight:700">aggressive — check BHA</span>';
+    else if (dlsHigh) flag = '<span style="color:#c62828;font-weight:700">short-radius / special BHA</span>';
+    return `<div style="margin-top:8px;padding:6px 8px;background:#f1f8e9;border-radius:4px;font-size:11px;line-height:1.5;color:#33691e">
+        <b>Tool feasibility:</b> ${flag}<br>
+        <b>3D budget:</b> if turning azimuth while building, effective DLS ≈ √(BR²+WR²). Size BR below tool limit accordingly.<br>
+        <b>Geology:</b> real DLS varies per formation. Use the "Realistic DLS profile" on the build segment to model ramp-up/ramp-down.
+    </div>`;
+}
+
+function drawParetoPlot(highlightIdx, exactSol) {
+    const pts = lastPareto.points;
+    const knee = pts[lastPareto.kneeIdx];
+    const sel  = exactSol || pts[highlightIdx];
+    const selLabel = exactSol ? 'Exact (target H)' : 'Selected';
+    const traces = [
+        { type:'scatter', mode:'lines', x: pts.map(p=>p.dls), y: pts.map(p=>p.hTotal),
+          line:{color:'#0d7377', width:2}, name:'Pareto curve',
+          hovertemplate:'DLS: %{x:.2f} deg/30m<br>H-Reach: %{y:.0f} m<extra></extra>' },
+        { type:'scatter', mode:'markers', x:[knee.dls], y:[knee.hTotal],
+          marker:{size:9, color:'#e67e22', symbol:'diamond', line:{color:'white',width:1}},
+          name:'Knee', hovertemplate:`Knee<br>α=${knee.alpha.toFixed(1)}°<br>DLS=${knee.dls.toFixed(2)}<br>H=${knee.hTotal.toFixed(0)}<extra></extra>` },
+        { type:'scatter', mode:'markers', x:[sel.dls], y:[sel.hTotal],
+          marker:{size:11, color:'#c0392b', symbol:'circle', line:{color:'white',width:2}},
+          name:selLabel, hovertemplate:`${selLabel}<br>α=${sel.alpha.toFixed(2)}°<br>DLS=${sel.dls.toFixed(3)}<br>H=${sel.hTotal.toFixed(1)}<extra></extra>` }
+    ];
+    Plotly.react('paretoPlot', traces, {
+        margin:{l:42,r:8,t:6,b:32}, showlegend:false,
+        xaxis:{title:{text:'DLS (deg/30m)',standoff:5}, titlefont:{size:10}, tickfont:{size:9}},
+        yaxis:{title:{text:'H-Reach (m)',standoff:5}, titlefont:{size:10}, tickfont:{size:9}},
+        plot_bgcolor:'#fcfcfc', paper_bgcolor:'white'
+    }, { displayModeBar:false, responsive:true });
+}
+
+function onReachSlider(val) {
+    if (!lastPareto) return;
+    const tA = document.getElementById('solverTargetAlpha');
+    const tH = document.getElementById('solverTargetH');
+    if (tA && tA.value.trim() !== '') tA.value = '';
+    if (tH && tH.value.trim() !== '') tH.value = '';
+    const pct = parseFloat(val);
+    const idx = Math.round(pct / 100 * (lastPareto.points.length - 1));
+    const isKnee = (idx === lastPareto.kneeIdx);
+    document.getElementById('reachVal').textContent = isKnee ? 'knee' :
+        (pct < 50 ? 'lower DLS' : 'higher reach');
+    applyReachSelection(idx, isKnee);
+}
+
+function rebuildSegmentsFromSolution(sol) {
+    if (!lastPareto) return;
+    const { kop, eobTvd, tdTvd, azi } = lastPareto;
+    segments = []; segmentIdCounter = 0;
+    addSegment('vertical', true);
+    segments[0].params = { fromMd: 0, toMd: kop };
+
+    addSegment('build', true);
+    segments[1].params = { rate: parseFloat(sol.dls.toFixed(3)),
+                           targetInc: parseFloat(sol.alpha.toFixed(3)),
+                           azi: azi,
+                           profileEnabled: false,
+                           fUp: 0.15, fDown: 0.15, kMin: 0.5 };
+
+    addSegment('hold', true);
+    segments[2].params = { length: parseFloat(sol.lHold.toFixed(2)) };
+
+    document.getElementById('vsAzimuth').value = azi;
+    plotRevision++;
+    renderSegments();
+    calculateAndPlot();
+}
+
+/* =============  SEGMENT UI  ============= */
+function addSegment(type, silent=false) {
+    const id = segmentIdCounter++;
+    let params = {};
+    if (type === 'vertical')  params = { fromMd: 0, toMd: 500 };
+    else if (type === 'build' || type === 'drop')
+        params = { rate:10, targetInc: type==='build'?90:0, azi:0,
+                   profileEnabled:false, fUp:0.15, fDown:0.15, kMin:0.5 };
+    else if (type === 'hold')  params = { length: 500 };
+    else if (type === 'turn')  params = { targetAzi:90, rate:5 };
+    segments.push({ id, type, params });
+    if (!silent) plotRevision++;
+    renderSegments();
+    if (!silent) calculateAndPlot();
+}
+
+function removeSegment(id) {
+    segments = segments.filter(s => s.id !== id);
+    delete segmentCollapsed[id];
+    plotRevision++;
+    renderSegments();
+    calculateAndPlot();
+}
+
+function toggleSegment(id) {
+    segmentCollapsed[id] = !segmentCollapsed[id];
+    renderSegments();
+}
+
+function collapseAllSegments(collapse) {
+    segments.forEach(s => { segmentCollapsed[s.id] = collapse; });
+    renderSegments();
+}
+
+function clearAll() {
+    segments = []; segmentIdCounter = 0; formations = []; formationIdCounter = 0;
+    lastPareto = null; currentSolution = null; segmentCollapsed = {};
+    plotRevision++;
+    renderSegments(); renderFormations();
+    ['plot2dPlan','plot2dVS','plot3d'].forEach(id => document.getElementById(id).innerHTML = '');
+    document.getElementById('survey-table').innerHTML = '';
+    document.getElementById('solver-results').innerHTML = '';
+    document.getElementById('solver-feasibility').textContent = '';
+    document.getElementById('paretoPlot').style.display = 'none';
+    document.getElementById('reachSliderBlock').style.display = 'none';
+    document.getElementById('tableInfo').textContent = '';
+    lastCalcResults = [];
+}
+
+function summarizeSegment(seg) {
+    const p = seg.params;
+    switch (seg.type) {
+        case 'vertical':
+            return `From ${p.fromMd ?? 0} m to ${p.toMd ?? 500} m MD`;
+        case 'hold':
+            return `Tangent length ${p.length ?? 500} m`;
+        case 'build':
+        case 'drop':
+            const profile = p.profileEnabled ? ' • realistic profile' : '';
+            return `→ ${(p.targetInc ?? 0).toFixed(1)}° @ ${(p.rate ?? 10).toFixed(2)} deg/30m, azi ${(p.azi ?? 0).toFixed(1)}°${profile}`;
+        case 'turn':
+            return `→ azimuth ${(p.targetAzi ?? 0).toFixed(1)}° @ ${(p.rate ?? 5).toFixed(1)} deg/30m`;
+        default:
+            return '';
+    }
+}
+
+function renderSegments() {
+    const c = document.getElementById('segments-container');
+    c.innerHTML = '';
+    segments.forEach((seg, idx) => {
+        const card = document.createElement('div');
+        card.className = 'segment-card';
+        const isCollapsed = !!segmentCollapsed[seg.id];
+        let fields = '';
+        const p = seg.params;
+
+        if (seg.type === 'vertical') {
+            fields = `
+                <div class="form-row">
+                    <div class="form-group"><label>From MD (m)</label><input type="number" value="${p.fromMd ?? 0}" step="1" onchange="updateParam(${seg.id},'fromMd',this.value)"></div>
+                    <div class="form-group"><label>To MD / KOP (m)</label><input type="number" value="${p.toMd ?? 500}" step="1" onchange="updateParam(${seg.id},'toMd',this.value)"></div>
+                </div>`;
+        }
+        else if (seg.type === 'hold') {
+            fields = `<div class="form-group"><label>Tangent Length (m)</label><input type="number" value="${p.length ?? 500}" step="1" onchange="updateParam(${seg.id},'length',this.value)"></div>`;
+        }
+        else if (seg.type === 'build' || seg.type === 'drop') {
+            const rate = p.rate ?? 10;
+            const targetInc = p.targetInc ?? (seg.type==='build'?90:0);
+            const azi = p.azi ?? 0;
+            const profileEnabled = !!p.profileEnabled;
+            const fUp = p.fUp ?? 0.15;
+            const fDown = p.fDown ?? 0.15;
+            const kMin = p.kMin ?? 0.5;
+
+            fields = `
+                <div class="slider-block">
+                    <label>Build/Drop Rate (nominal) <span class="value" id="rateVal-${seg.id}">${Number(rate).toFixed(2)} deg/30m</span></label>
+                    <input type="range" min="0.5" max="60" step="0.1" value="${rate}" oninput="onSliderInput(${seg.id},'rate',this.value)">
+                    <div class="slider-row"><input type="number" step="0.1" value="${rate}" oninput="onSliderInput(${seg.id},'rate',this.value,true)"><small>deg/30m</small></div>
+                </div>
+                <div class="slider-block">
+                    <label>Target Inclination <span class="value" id="targetIncVal-${seg.id}">${Number(targetInc).toFixed(2)} deg</span></label>
+                    <input type="range" min="0" max="90" step="0.1" value="${targetInc}" oninput="onSliderInput(${seg.id},'targetInc',this.value)">
+                    <div class="slider-row"><input type="number" step="0.1" value="${targetInc}" oninput="onSliderInput(${seg.id},'targetInc',this.value,true)"><small>deg</small></div>
+                </div>
+                <div class="form-group"><label>Azimuth (deg)</label><input type="number" value="${azi}" step="0.1" onchange="updateParam(${seg.id},'azi',this.value)"></div>
+
+                <div class="dls-profile">
+                    <label class="dls-profile-toggle">
+                        <input type="checkbox" ${profileEnabled?'checked':''} onchange="toggleProfile(${seg.id}, this.checked)">
+                        Realistic DLS profile (ramp up / ramp down)
+                    </label>
+                    <div class="dls-profile-body ${profileEnabled?'open':''}" id="profileBody-${seg.id}">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Ramp-Up (% of seg)</label>
+                                <input type="number" value="${Math.round(fUp*100)}" step="1" min="0" max="45"
+                                    onchange="updateProfileParam(${seg.id},'fUp',this.value)">
+                            </div>
+                            <div class="form-group">
+                                <label>Ramp-Down (% of seg)</label>
+                                <input type="number" value="${Math.round(fDown*100)}" step="1" min="0" max="45"
+                                    onchange="updateProfileParam(${seg.id},'fDown',this.value)">
+                            </div>
+                            <div class="form-group">
+                                <label>End-DLS (% of nominal)</label>
+                                <input type="number" value="${Math.round(kMin*100)}" step="5" min="10" max="100"
+                                    onchange="updateProfileParam(${seg.id},'kMin',this.value)">
+                            </div>
+                        </div>
+                        <div class="metrics" id="profileMetrics-${seg.id}"></div>
+                        <span class="note">Real tools can't instantly hit the nominal DLS. The ramp-up lets the BHA orient and engage; the ramp-down lets you land smoothly on the target inclination without overshoot. The segment length is auto-extended so the target angle is still reached exactly.</span>
+                    </div>
+                </div>
+
+                <div class="eob-readout" id="eobReadout-${seg.id}"><b>Results appear after calculation.</b></div>`;
+        }
+        else if (seg.type === 'turn') {
+            fields = `
+                <div class="form-row">
+                    <div class="form-group"><label>Target Azimuth (deg)</label><input type="number" value="${p.targetAzi ?? 90}" step="0.1" onchange="updateParam(${seg.id},'targetAzi',this.value)"></div>
+                    <div class="form-group"><label>Turn Rate (deg/30m)</label><input type="number" value="${p.rate ?? 5}" step="0.1" onchange="updateParam(${seg.id},'rate',this.value)"></div>
+                </div>`;
+        }
+
+        const summary = isCollapsed ? `<div class="segment-summary">${summarizeSegment(seg)}</div>` : '';
+        card.innerHTML = `
+            <div class="segment-header">
+                <h3>${idx+1}. ${seg.type.toUpperCase()}</h3>
+                <div class="segment-ctrls">
+                    <button class="btn-toggle" title="${isCollapsed?'Expand':'Collapse'}" onclick="toggleSegment(${seg.id})">${isCollapsed?'▸':'▾'}</button>
+                    <button class="btn btn-danger" style="padding:3px 10px;font-size:11px;margin:0" onclick="removeSegment(${seg.id})">X</button>
+                </div>
+            </div>
+            ${summary}
+            <div class="segment-body${isCollapsed?' collapsed':''}">${fields}</div>`;
+        c.appendChild(card);
+    });
+
+    segments.forEach(seg => {
+        if ((seg.type === 'build' || seg.type === 'drop') && !segmentCollapsed[seg.id]) {
+            updateProfileMetrics(seg.id);
+        }
+    });
+}
+
+function updateParam(id, key, value) {
+    const seg = segments.find(s => s.id === id);
+    if (seg) { seg.params[key] = parseFloat(value); calculateAndPlot(); }
+}
+
+function updateProfileParam(id, key, value) {
+    const seg = segments.find(s => s.id === id);
+    if (!seg) return;
+    const v = parseFloat(value) / 100;
+    if (key === 'fUp' || key === 'fDown') seg.params[key] = Math.max(0, Math.min(0.45, v));
+    if (key === 'kMin') seg.params[key] = Math.max(0.1, Math.min(1, v));
+    updateProfileMetrics(id);
+    calculateAndPlot();
+}
+
+function toggleProfile(id, enabled) {
+    const seg = segments.find(s => s.id === id);
+    if (!seg) return;
+    seg.params.profileEnabled = enabled;
+    const body = document.getElementById(`profileBody-${id}`);
+    if (body) body.classList.toggle('open', enabled);
+    updateProfileMetrics(id);
+    calculateAndPlot();
+}
+
+function updateProfileMetrics(id) {
+    const seg = segments.find(s => s.id === id);
+    if (!seg) return;
+    const el = document.getElementById(`profileMetrics-${id}`);
+    if (!el) return;
+    const p = seg.params;
+    const rate = p.rate || 10;
+    const targetInc = p.targetInc || 0;
+    let startInc = 0;
+    const idx = segments.indexOf(seg);
+    for (let k = idx - 1; k >= 0; k--) {
+        const prev = segments[k];
+        if (prev.type === 'build' || prev.type === 'drop') { startInc = prev.params.targetInc ?? 0; break; }
+        if (prev.type === 'vertical') { startInc = 0; break; }
+    }
+    const dInc = Math.abs(targetInc - startInc);
+    const fUp = p.fUp ?? 0.15, fDown = p.fDown ?? 0.15, kMin = p.kMin ?? 0.5;
+    const lenIdeal = dInc / rate * 30;
+    const factor = 1 - 0.5 * (fUp + fDown) * (1 - kMin);
+    const lenProfile = factor > 0 ? (dInc * 30) / (rate * factor) : lenIdeal;
+    const dlsMin = rate * kMin;
+    if (p.profileEnabled) {
+        el.innerHTML = `<span>Segment length <b>${lenProfile.toFixed(1)} m</b> (vs ${lenIdeal.toFixed(1)} m ideal)</span>
+                        <span>DLS range <b>${dlsMin.toFixed(2)} – ${rate.toFixed(2)}</b> deg/30m</span>`;
+    } else {
+        el.innerHTML = `<span>Segment length <b>${lenIdeal.toFixed(1)} m</b> (constant DLS)</span>`;
+    }
+}
+
+function onSliderInput(id, key, value, fromNumber=false) {
+    const seg = segments.find(s => s.id === id);
+    if (!seg) return;
+    const v = parseFloat(value); if (isNaN(v)) return;
+    seg.params[key] = v;
+    const label = document.getElementById(`${key}Val-${id}`);
+    if (label) {
+        if (key === 'rate') label.textContent = v.toFixed(2) + ' deg/30m';
+        else if (key === 'targetInc') label.textContent = v.toFixed(2) + ' deg';
+    }
+    const card = label ? label.closest('.slider-block') : null;
+    if (card) {
+        const r = card.querySelector('input[type="range"]');
+        const n = card.querySelector('.slider-row input[type="number"]');
+        if (r) r.value = v;
+        if (n) n.value = v;
+    }
+    updateProfileMetrics(id);
+    clearTimeout(sliderUpdateTimer);
+    sliderUpdateTimer = setTimeout(calculateAndPlot, 40);
+}
+
+/* =============  FORMATION UI  ============= */
+function addFormation() {
+    const id = formationIdCounter++;
+    formations.push({ id, name:'Formation '+(formations.length+1), depth:1000, depthType:'TVD', dip:0, strike:0, color:pickColor(formations.length) });
+    plotRevision++;
+    renderFormations(); calculateAndPlot();
+}
+function removeFormation(id) {
+    formations = formations.filter(f => f.id !== id);
+    plotRevision++;
+    renderFormations(); calculateAndPlot();
+}
+
+function updateFormation(id, key, value) {
+    const f = formations.find(x => x.id === id); if (!f) return;
+    if (key === 'name' || key === 'depthType' || key === 'color') f[key] = value;
+    else f[key] = parseFloat(value);
+    calculateAndPlot();
+}
+function updateFormationNameDebounced(id, value) {
+    const f = formations.find(x => x.id === id); if (f) f.name = value;
+    clearTimeout(formationNameTimer);
+    formationNameTimer = setTimeout(calculateAndPlot, 250);
+}
+function pickColor(i) {
+    const p = ['#8e44ad','#16a085','#d35400','#2980b9','#c0392b','#27ae60','#e67e22','#7f8c8d','#e91e63','#00838f'];
+    return p[i % p.length];
+}
+
+function renderFormations() {
+    const c = document.getElementById('formations-container'); c.innerHTML = '';
+    formations.forEach(f => {
+        const card = document.createElement('div'); card.className = 'segment-card formation-card';
+        card.innerHTML = `
+            <div class="segment-header">
+                <h3>${f.name}</h3>
+                <div class="segment-ctrls">
+                    <button class="btn btn-danger" style="padding:3px 10px;font-size:11px;margin:0" onclick="removeFormation(${f.id})">X</button>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Name</label><input type="text" value="${f.name}" oninput="updateFormationNameDebounced(${f.id},this.value)"></div>
+                <div class="form-group" style="max-width:60px"><label>Color</label><input type="color" value="${f.color}" oninput="updateFormation(${f.id},'color',this.value)" style="padding:0;height:32px"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Depth</label><input type="number" value="${f.depth}" step="1" onchange="updateFormation(${f.id},'depth',this.value)"></div>
+                <div class="form-group"><label>Type</label><select onchange="updateFormation(${f.id},'depthType',this.value)">
+                    <option value="TVD" ${f.depthType==='TVD'?'selected':''}>TVD</option>
+                    <option value="MD"  ${f.depthType==='MD'?'selected':''}>MD</option>
+                </select></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Dip (deg)</label><input type="number" step="0.1" value="${f.dip}" onchange="updateFormation(${f.id},'dip',this.value)"></div>
+                <div class="form-group"><label>Strike (deg)</label><input type="number" step="0.1" value="${f.strike}" onchange="updateFormation(${f.id},'strike',this.value)"></div>
+            </div>`;
+        c.appendChild(card);
+    });
+}
+
+/* =============  ANNOTATION CONTROL UI  ============= */
+function renderAnnotationTable() {
+    const tbody = document.getElementById('annTableBody');
+    const plots = ['plan', 'vs', 'd3'];
+    let html = '';
+    ANN_MARKERS.forEach(m => {
+        html += `<tr><td><span class="row-accent" style="background:${m.color}"></span>${m.label}</td>`;
+        plots.forEach(pk => {
+            const disabled = (m.key === 'wellhead' && pk !== 'plan') ? 'disabled' : '';
+            const checked = reportOptions[pk][m.key] ? 'checked' : '';
+            html += `<td><input type="checkbox" ${checked} ${disabled}
+                onchange="onAnnToggle('${pk}','${m.key}',this.checked)"></td>`;
+        });
+        html += '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+function onAnnToggle(plot, key, val) {
+    reportOptions[plot][key] = val;
+    plotRevision++;
+    if (lastCalcResults.length > 0) calculateAndPlot();
+}
+
+function onWellNameInput(v) {
+    wellName = v.trim() || 'our well';
+    clearTimeout(window._wellNameTimer);
+    window._wellNameTimer = setTimeout(() => {
+        plotRevision++;
+        if (lastCalcResults.length > 0) calculateAndPlot();
+    }, 250);
+}
+
+/* =============  SURVEY GENERATOR  ============= */
+function generateSurveyFromSegments() {
+    const surveys = [{ md:0, inc:0, azi:0, tvd:0, marker:'SURFACE' }];
+    let curMd = 0, curInc = 0, curAzi = 0, curTvd = 0;
+    const endpoints = {};
+
+    for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i], p = seg.params;
+        const startState = { md:curMd, tvd:curTvd, inc:curInc, azi:curAzi };
+
+        if (seg.type === 'vertical') {
+            const fromMd = p.fromMd ?? 0;
+            const toMd   = p.toMd ?? 500;
+            const len = toMd - Math.max(curMd, fromMd);
+            if (len > 0) { curTvd += len; curMd += len; }
+            if (curMd < toMd) { curTvd += (toMd - curMd); curMd = toMd; }
+            surveys.push({ md:curMd, inc:0, azi:curAzi, tvd:curTvd, marker:'' });
+        }
+        else if (seg.type === 'hold') {
+            const len = p.length || 0;
+            if (len > 0) { curTvd += len * Math.cos(curInc * degToRad); curMd += len; }
+            surveys.push({ md:curMd, inc:curInc, azi:curAzi, tvd:curTvd, marker:'' });
+        }
+        else if (seg.type === 'build' || seg.type === 'drop') {
+            if (p.azi !== undefined && p.azi !== null) curAzi = p.azi;
+            const rate = p.rate || 10;
+            const targetInc = p.targetInc || 0;
+            const deltaInc = targetInc - curInc;
+
+            const useProfile = !!p.profileEnabled;
+            const fUp   = Math.max(0, Math.min(0.45, p.fUp   ?? 0.15));
+            const fDown = Math.max(0, Math.min(0.45, p.fDown ?? 0.15));
+            const kMin  = Math.max(0.10, Math.min(1, p.kMin ?? 0.5));
+
+            let segmentLength = 0;
+            if (Math.abs(deltaInc) > 1e-9) {
+                if (useProfile) {
+                    const factor = 1 - 0.5 * (fUp + fDown) * (1 - kMin);
+                    segmentLength = Math.abs(deltaInc) * 30 / (rate * factor);
+                } else {
+                    segmentLength = Math.abs(deltaInc / rate) * 30;
+                }
+            }
+
+            if (segmentLength > 0) {
+                let startMarker = '';
+                const prevSurv = surveys[surveys.length-1];
+                if (curInc === 0 && deltaInc !== 0) startMarker = 'KOP';
+                if (startMarker && !prevSurv.marker) prevSurv.marker = startMarker;
+
+                const steps = useProfile
+                    ? Math.max(40, Math.round(segmentLength / 1))
+                    : Math.max(10, Math.round(segmentLength / 10));
+                const mdStep = segmentLength / steps;
+                const rateNomPerM = rate / 30;
+                const signDI = Math.sign(deltaInc);
+                const sUp = fUp * segmentLength;
+                const sDown = fDown * segmentLength;
+
+                const rateAt = sMid => {
+                    if (!useProfile) return rateNomPerM;
+                    if (sMid < sUp && sUp > 1e-9)
+                        return rateNomPerM * (kMin + (1 - kMin) * (sMid / sUp));
+                    if (sMid > segmentLength - sDown && sDown > 1e-9)
+                        return rateNomPerM * (kMin + (1 - kMin) * ((segmentLength - sMid) / sDown));
+                    return rateNomPerM;
+                };
+
+                let s = 0;
+                for (let j = 1; j <= steps; j++) {
+                    const sMid = s + mdStep / 2;
+                    const rMid = rateAt(sMid);
+                    const rRadPerM = rMid * degToRad;
+                    const incStart = curInc;
+                    const dIncStep = signDI * rMid * mdStep;
+                    curInc += dIncStep;
+                    if (rRadPerM > 1e-10) {
+                        const iS = incStart * degToRad;
+                        const iE = curInc * degToRad;
+                        curTvd += (1 / rRadPerM) * (Math.sin(iE) - Math.sin(iS));
+                    } else {
+                        curTvd += mdStep;
+                    }
+                    curMd += mdStep;
+                    s += mdStep;
+                    let mk = ''; if (j === steps) mk = seg.type==='build'?'EOB':'EOD';
+                    surveys.push({ md:curMd, inc:curInc, azi:curAzi, tvd:curTvd, marker:mk });
+                }
+                const last = surveys[surveys.length - 1];
+                last.inc = targetInc;
+            }
+        }
+        else if (seg.type === 'turn') {
+            const targetAzi = p.targetAzi || 0, rate = p.rate || 5;
+            let dAzi = targetAzi - curAzi;
+            if (dAzi > 180) dAzi -= 360; if (dAzi < -180) dAzi += 360;
+            const segLen = Math.abs(dAzi / rate) * 30;
+            if (segLen > 0) {
+                if (!surveys[surveys.length-1].marker) surveys[surveys.length-1].marker = 'SOT';
+                const steps = Math.max(10, Math.round(segLen/10));
+                const mdStep = segLen/steps, aziStep = dAzi/steps;
+                for (let j = 1; j <= steps; j++) {
+                    curMd += mdStep; curAzi += aziStep;
+                    if (curAzi < 0) curAzi += 360; if (curAzi >= 360) curAzi -= 360;
+                    curTvd += mdStep * Math.cos(curInc * degToRad);
+                    let mk = ''; if (j === steps) mk = 'EOT';
+                    surveys.push({ md:curMd, inc:curInc, azi:curAzi, tvd:curTvd, marker:mk });
+                }
+            }
+        }
+        endpoints[seg.id] = { start:startState, end:{ md:curMd, tvd:curTvd, inc:curInc, azi:curAzi } };
+    }
+    if (surveys.length > 1) surveys[surveys.length-1].marker = 'TD';
+    surveys._endpoints = endpoints;
+    return surveys;
+}
+
+/* =============  MINIMUM CURVATURE  ============= */
+function calculateMinimumCurvature(surveys) {
+    if (!surveys || surveys.length < 2) return [];
+    const res = [{ ...surveys[0], northing:0, easting:0, dls:0 }];
+    for (let i = 1; i < surveys.length; i++) {
+        const prev = surveys[i-1], curr = surveys[i];
+        const dMD = curr.md - prev.md; if (dMD === 0) continue;
+        const i1 = prev.inc*degToRad, a1 = prev.azi*degToRad;
+        const i2 = curr.inc*degToRad, a2 = curr.azi*degToRad;
+        let cosDL = Math.cos(i2-i1) - Math.sin(i1)*Math.sin(i2)*(1-Math.cos(a2-a1));
+        cosDL = Math.max(-1, Math.min(1, cosDL));
+        const dl = Math.acos(cosDL);
+        let rf = 1; if (dl > 1e-10) rf = (2/dl)*Math.tan(dl/2);
+        const dN = (dMD/2)*(Math.sin(i1)*Math.cos(a1)+Math.sin(i2)*Math.cos(a2))*rf;
+        const dE = (dMD/2)*(Math.sin(i1)*Math.sin(a1)+Math.sin(i2)*Math.sin(a2))*rf;
+        const dT = (dMD/2)*(Math.cos(i1)+Math.cos(i2))*rf;
+        const dls = (radToDeg*dl/dMD)*30;
+        const pr = res[i-1];
+        res.push({ md:curr.md, inc:curr.inc, azi:curr.azi, marker:curr.marker,
+            tvd:pr.tvd+dT, northing:pr.northing+dN, easting:pr.easting+dE, dls });
+    }
+    return res;
+}
+
+function vsDep(n, e, vsAzRad) { return n*Math.cos(vsAzRad) + e*Math.sin(vsAzRad); }
+
+function interpolateAtMD(results, mdTarget) {
+    if (!results || !results.length) return null;
+    if (mdTarget <= results[0].md) return { ...results[0] };
+    if (mdTarget >= results[results.length-1].md) return { ...results[results.length-1] };
+    for (let i = 1; i < results.length; i++) {
+        if (results[i].md >= mdTarget) {
+            const a = results[i-1], b = results[i];
+            const t = (mdTarget - a.md) / (b.md - a.md);
+            return { md:mdTarget, tvd:a.tvd+t*(b.tvd-a.tvd), northing:a.northing+t*(b.northing-a.northing),
+                easting:a.easting+t*(b.easting-a.easting), inc:a.inc+t*(b.inc-a.inc), azi:a.azi+t*(b.azi-a.azi),
+                dls:a.dls+t*(b.dls-a.dls) };
+        }
+    }
+    return { ...results[results.length-1] };
+}
+
+function findMdAtTvd(results, targetTvd) {
+    for (let i = 1; i < results.length; i++) {
+        const t0 = results[i-1].tvd, t1 = results[i].tvd;
+        if ((t0 <= targetTvd && t1 >= targetTvd) || (t0 >= targetTvd && t1 <= targetTvd)) {
+            if (Math.abs(t1-t0) < 0.001) return results[i].md;
+            const t = (targetTvd - t0) / (t1 - t0);
+            return results[i-1].md + t*(results[i].md - results[i-1].md);
+        }
+    }
+    return null;
+}
+
+/* =============  MAIN PIPELINE  ============= */
+function autoSetVsAzimuth() {
+    if (lastCalcResults.length < 2) { alert('Calculate the well first.'); return; }
+    const tail = lastCalcResults[lastCalcResults.length-1];
+    let az = Math.atan2(tail.easting, tail.northing) * radToDeg;
+    if (az < 0) az += 360;
+    document.getElementById('vsAzimuth').value = az.toFixed(2);
+    plotRevision++;
+    calculateAndPlot();
+}
+
+function calculateAndPlot() {
+    if (segments.length === 0) {
+        ['plot2dPlan','plot2dVS','plot3d'].forEach(id => document.getElementById(id).innerHTML = '');
+        document.getElementById('survey-table').innerHTML = '';
+        document.getElementById('tableInfo').textContent = '';
+        lastCalcResults = []; return;
+    }
+    const surveys = generateSurveyFromSegments();
+    if (!surveys) return;
+    const results = calculateMinimumCurvature(surveys);
+    lastCalcResults = results;
+
+    const vsAzDeg = parseFloat(document.getElementById('vsAzimuth').value) || 0;
+    const vsAzRad = vsAzDeg * degToRad;
+    lastVsAz = vsAzDeg;
+    results.forEach(p => { p.vsDep = vsDep(p.northing, p.easting, vsAzRad); p.radDep = Math.sqrt(p.northing**2+p.easting**2); });
+
+    const ep = surveys._endpoints || {};
+    segments.forEach(seg => {
+        if (seg.type === 'build' || seg.type === 'drop') {
+            const rd = document.getElementById(`eobReadout-${seg.id}`);
+            if (!rd) return;
+            const e = ep[seg.id]; if (!e) { rd.innerHTML = '<b>No data.</b>'; return; }
+            const er = results.reduce((b,r) => Math.abs(r.md-e.end.md)<Math.abs(b.md-e.end.md)?r:b, results[0]);
+            rd.innerHTML = `<b>End-of-Segment</b><br>MD = <span class="val">${e.end.md.toFixed(2)} m</span> | TVD = <span class="val">${e.end.tvd.toFixed(2)} m</span><br>
+                Inc = <span class="val">${e.end.inc.toFixed(2)} deg</span> | VS-Dep = <span class="val">${er.vsDep.toFixed(2)} m</span>`;
+        }
+    });
+
+    renderPlots(results, vsAzDeg);
+    renderTable(results, vsAzRad);
+}
+
+/* =============  HELPERS  ============= */
+function hexToRgba(hex, alpha) {
+    if (!hex || hex[0] !== '#') return `rgba(120,120,120,${alpha})`;
+    const r = parseInt(hex.slice(1,3), 16),
+          g = parseInt(hex.slice(3,5), 16),
+          b = parseInt(hex.slice(5,7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function spreadAnnotations(items, opts={}) {
+    const {
+        baseAx = 45, baseAy = -38, layerAx = 22, layerAy = 24,
+        minSep = 0.045
+    } = opts;
+    if (!items.length) return [];
+    const sorted = [...items].sort((a,b) => a.y - b.y);
+    const yMin = sorted[0].y, yMax = sorted[sorted.length-1].y;
+    const sepThreshold = Math.max(1, (yMax - yMin) * minSep);
+    let cluster = 0, prevY = -Infinity;
+    return sorted.map((it, i) => {
+        if (i > 0 && (it.y - prevY) < sepThreshold) cluster++; else cluster = 0;
+        const side = (i % 2 === 0) ? 1 : -1;
+        prevY = it.y;
+        return {
+            x: it.x, y: it.y,
+            text: it.text || `<b>${it.label}</b>`,
+            showarrow: true, arrowhead: 2, arrowsize: 0.7, arrowwidth: 1,
+            arrowcolor: it.color || '#444',
+            ax: side * (baseAx + cluster * layerAx),
+            ay: baseAy - cluster * layerAy,
+            font: { size: 10, color: '#1b2838' },
+            bordercolor: it.color || '#999', borderwidth: 1, borderpad: 3,
+            bgcolor: 'rgba(255,255,255,0.95)', captureevents: false
+        };
+    });
+}
+
+/* =============  FORMATION TRACE BUILDERS  ============= */
+function resolveFormationsForVS(results, vsAzRad) {
+    return formations.map(f => {
+        let N0=0, E0=0, TVD0=f.depth;
+        if (f.depthType === 'MD') {
+            const a = interpolateAtMD(results, f.depth);
+            if (!a) return null;
+            N0=a.northing; E0=a.easting; TVD0=a.tvd;
+        }
+        const dip = f.dip || 0;
+        const dipDirRad = ((f.strike || 0) + 90) * degToRad;
+        const tanDip = Math.tan(dip * degToRad);
+        const anchorVsDep = vsDep(N0, E0, vsAzRad);
+        const anchorDipProj = N0 * Math.cos(dipDirRad) + E0 * Math.sin(dipDirRad);
+        const tvdFn = d => TVD0 + (d * Math.cos(vsAzRad - dipDirRad) - anchorDipProj) * tanDip;
+        return { ...f, N0, E0, TVD0, dipDirRad, tanDip, anchorVsDep, tvdFn };
+    }).filter(Boolean);
+}
+
+function buildFormationVSTraces(results, vsAzDeg) {
+    const vsAzRad = vsAzDeg * degToRad;
+    const depMin = Math.min(0, ...results.map(r => r.vsDep));
+    const depMax = Math.max(0, ...results.map(r => r.vsDep));
+    const pad = Math.max(50, (depMax - depMin) * 0.12);
+    const xS = depMin - pad, xE = depMax + pad;
+    const fmR = resolveFormationsForVS(results, vsAzRad);
+
+    const traces = [];
+    const showFill = document.getElementById('fillToggle')?.checked;
+    if (showFill && fmR.length >= 2) {
+        const sorted = [...fmR].sort((a,b) => a.tvdFn(0) - b.tvdFn(0));
+        for (let i = 0; i < sorted.length - 1; i++) {
+            const top = sorted[i], bot = sorted[i+1];
+            traces.push({
+                type:'scatter', mode:'lines',
+                x: [xS, xE, xE, xS, xS],
+                y: [top.tvdFn(xS), top.tvdFn(xE), bot.tvdFn(xE), bot.tvdFn(xS), top.tvdFn(xS)],
+                fill:'toself', fillcolor: hexToRgba(top.color, 0.18),
+                line: { color: 'rgba(0,0,0,0)', width: 0 },
+                name: `${top.name} → ${bot.name}`,
+                hoverinfo: 'name', showlegend: true
+            });
+        }
+    }
+
+    fmR.forEach(f => {
+        traces.push({
+            type:'scatter', mode:'lines+text',
+            x:[xS, xE], y:[f.tvdFn(xS), f.tvdFn(xE)],
+            line:{ width:2, color:f.color, dash: f.dip===0 ? 'dash' : 'solid' },
+            name:f.name,
+            text:['', f.name], textposition:'top left',
+            textfont:{ color:f.color, size:11 },
+            hovertemplate:`<b>${f.name}</b><br>TVD: %{y:.1f} m<br>VS-Dep: %{x:.1f} m<extra></extra>`
+        });
+        traces.push({
+            type:'scatter', mode:'markers',
+            x:[f.anchorVsDep], y:[f.TVD0],
+            marker:{ size:9, color:f.color, symbol:'diamond', line:{color:'white', width:1} },
+            name: f.name + ' (anchor)', showlegend: false,
+            hovertemplate:`<b>${f.name} anchor</b><br>TVD: %{y:.1f} m<extra></extra>`
+        });
+    });
+    return traces;
+}
+
+function buildFormation3DTraces(results) {
+    const traces = [];
+    if (!formations.length) return traces;
+
+    const nVals = results.map(r => r.northing), eVals = results.map(r => r.easting);
+    const nMin = Math.min(...nVals)-100, nMax = Math.max(...nVals)+100;
+    const eMin = Math.min(...eVals)-100, eMax = Math.max(...eVals)+100;
+    const cN = (nMin+nMax)/2, cE = (eMin+eMax)/2;
+
+    const fmR = formations.map(f => {
+        let N0=0, E0=0, TVD0=f.depth;
+        if (f.depthType === 'MD') {
+            const a = interpolateAtMD(results, f.depth);
+            if (!a) return null;
+            N0=a.northing; E0=a.easting; TVD0=a.tvd;
+        }
+        const dip = f.dip || 0;
+        const dipDirRad = ((f.strike || 0) + 90) * degToRad;
+        const tanDip = Math.tan(dip * degToRad);
+        const tvdAt = (n,e) => TVD0 + ((n-N0)*Math.cos(dipDirRad) + (e-E0)*Math.sin(dipDirRad)) * tanDip;
+        const tvdAtCenter = tvdAt(cN, cE);
+        return { ...f, tvdAt, tvdAtCenter };
+    }).filter(Boolean);
+
+    fmR.forEach(f => {
+        const corners = [{n:nMin,e:eMin},{n:nMax,e:eMin},{n:nMax,e:eMax},{n:nMin,e:eMax}];
+        traces.push({
+            type:'mesh3d',
+            x: corners.map(c=>c.e), y: corners.map(c=>c.n), z: corners.map(c=>f.tvdAt(c.n, c.e)),
+            i:[0,0], j:[1,2], k:[2,3],
+            color: f.color, opacity: 0.32, name: f.name, showlegend: true,
+            flatshading: true, hovertemplate: `<b>${f.name}</b><extra></extra>`
+        });
+    });
+
+    const showFill = document.getElementById('fillToggle')?.checked;
+    if (showFill && fmR.length >= 2) {
+        const sorted = [...fmR].sort((a,b) => a.tvdAtCenter - b.tvdAtCenter);
+        for (let i = 0; i < sorted.length - 1; i++) {
+            const top = sorted[i], bot = sorted[i+1];
+            const corners = [{n:nMin,e:eMin},{n:nMax,e:eMin},{n:nMax,e:eMax},{n:nMin,e:eMax}];
+            const xs = [], ys = [], zs = [];
+            corners.forEach(c => { xs.push(c.e); ys.push(c.n); zs.push(top.tvdAt(c.n, c.e)); });
+            corners.forEach(c => { xs.push(c.e); ys.push(c.n); zs.push(bot.tvdAt(c.n, c.e)); });
+            const ii = [0, 0, 4, 4, 0, 0, 1, 1, 2, 2, 3, 3];
+            const jj = [1, 2, 5, 6, 1, 5, 2, 6, 3, 7, 0, 4];
+            const kk = [2, 3, 6, 7, 5, 4, 6, 5, 7, 6, 4, 7];
+            traces.push({
+                type:'mesh3d',
+                x: xs, y: ys, z: zs, i: ii, j: jj, k: kk,
+                color: top.color, opacity: 0.16,
+                name: `${top.name} → ${bot.name}`, showlegend: true,
+                hoverinfo: 'name', flatshading: true
+            });
+        }
+    }
+
+    return traces;
+}
+
+/* =============  PLOTTING  ============= */
+function renderPlots(results, vsAzDeg) {
+    const vsAzRad = vsAzDeg * degToRad;
+
+    const planItems = [], vsItems = [];
+    const d3MarkerPts = [];
+    results.forEach(p => {
+        if (!p.marker || p.marker === 'SURFACE') return;
+        if (reportOptions.plan[p.marker])
+            planItems.push({ x: p.easting, y: p.northing,
+                text:`<b>${p.marker}</b><br>@ ${p.tvd.toFixed(0)} m TVD` });
+        if (reportOptions.vs[p.marker])
+            vsItems.push({ x: p.vsDep, y: p.tvd,
+                text:`<b>${p.marker}</b><br>@ ${p.tvd.toFixed(0)} m TVD` });
+        if (reportOptions.d3[p.marker])
+            d3MarkerPts.push(p);
+    });
+
+    const fm3DItems = [];
+    formations.forEach(f => {
+        let mdT; if (f.depthType==='MD') mdT=f.depth; else mdT=findMdAtTvd(results,f.depth);
+        if (mdT === null) return;
+        const ip = interpolateAtMD(results, mdT); if (!ip) return;
+        const fvs = vsDep(ip.northing, ip.easting, vsAzRad);
+        if (reportOptions.plan.formations)
+            planItems.push({ x: ip.easting, y: ip.northing, color: f.color,
+                text:`<b>Top ${f.name}</b><br>@ ${ip.tvd.toFixed(0)} m TVD` });
+        if (reportOptions.vs.formations)
+            vsItems.push({ x: fvs, y: ip.tvd, color: f.color,
+                text:`<b>Top ${f.name}</b><br>@ ${ip.tvd.toFixed(0)} m TVD` });
+        if (reportOptions.d3.formations)
+            fm3DItems.push({ ...ip, fmName:"Top "+f.name, fmColor:f.color });
+    });
+
+    const planAnn = spreadAnnotations(planItems);
+    const vsAnn   = spreadAnnotations(vsItems);
+
+    const tracePlan = { type:'scatter', mode:'lines+markers',
+        x:results.map(p=>p.easting), y:results.map(p=>p.northing),
+        line:{width:3,color:'#e74c3c'}, marker:{size:4,color:'#2c3e50'}, name:'Wellpath',
+        hovertemplate:'E: %{x:.1f} m<br>N: %{y:.1f} m<extra></extra>' };
+    const maxR = Math.max(10, ...results.map(p => Math.sqrt(p.northing**2+p.easting**2)));
+    const vsLine = { type:'scatter', mode:'lines',
+        x:[0,maxR*1.1*Math.sin(vsAzRad)], y:[0,maxR*1.1*Math.cos(vsAzRad)],
+        line:{width:1,color:'#888',dash:'dot'}, name:`VS-Az ${vsAzDeg.toFixed(1)} deg` };
+
+    const planTraces = [tracePlan, vsLine];
+    if (reportOptions.plan.wellhead) {
+        planTraces.push({
+            type:'scatter', mode:'markers+text',
+            x:[0], y:[0],
+            marker:{ size:20, color:'#c0392b', symbol:'star',
+                line:{color:'#7b1e1a', width:1.8} },
+            text:[`  ${wellName}`], textposition:'middle right',
+            textfont:{ size:13, color:'#7b1e1a', family:'Segoe UI' },
+            name:`${wellName} (wellhead)`,
+            hovertemplate:`<b>${wellName}</b><br>Wellhead (0, 0)<extra></extra>`,
+            showlegend:true
+        });
+    }
+
+    Plotly.react('plot2dPlan', planTraces, {
+        title:{text:'Plan View',font:{size:14}},
+        xaxis:{title:'Easting (m)',scaleanchor:'y',scaleratio:1},
+        yaxis:{title:'Northing (m)'}, margin:{l:55,r:25,t:38,b:45},
+        legend:{orientation:'h',y:-0.15},
+        plot_bgcolor:'#fafbfc', paper_bgcolor:'white',
+        uirevision: plotRevision, annotations: planAnn
+    }, {responsive:true});
+
+    const kopSurv = results.find(r => r.marker === 'KOP');
+    const topTvd = kopSurv ? Math.max(0, kopSurv.tvd - 50) : 0;
+    const maxTvd = Math.max(...results.map(r => r.tvd));
+    const tvdPad = Math.max(20, (maxTvd - topTvd) * 0.05);
+
+    const fmTraces = buildFormationVSTraces(results, vsAzDeg);
+    const traceVS = { type:'scatter', mode:'lines+markers',
+        x:results.map(p=>p.vsDep), y:results.map(p=>p.tvd),
+        line:{width:3,color:'#16a085'}, marker:{size:4,color:'#2c3e50'}, name:'Wellpath',
+        hovertemplate:'VS-Dep: %{x:.1f} m<br>TVD: %{y:.1f} m<extra></extra>' };
+
+    Plotly.react('plot2dVS', [...fmTraces, traceVS], {
+        title:{text:`Vertical Section (VS-Az = ${vsAzDeg.toFixed(1)} deg)`,font:{size:14}},
+        xaxis:{title:'VS-Departure (m)'},
+        yaxis:{ title:'TVD (m)', autorange:false,
+                range: [maxTvd + tvdPad, topTvd] },
+        margin:{l:55,r:25,t:38,b:45}, legend:{orientation:'h',y:-0.15},
+        plot_bgcolor:'#fafbfc', paper_bgcolor:'white',
+        uirevision: plotRevision, annotations: vsAnn
+    }, {responsive:true});
+
+    /* --- 3D Plot ---  Starts 50 m above KOP instead of surface.
+       The vertical section from surface adds no geometric value in 3D.
+       We crop the wellpath and insert an interpolated start point so
+       the path begins cleanly at (KOP_TVD − 50 m). Formation meshes
+       still use the full results for spatial bounds. */
+
+    const startTvd3D = kopSurv ? Math.max(0, kopSurv.tvd - 50) : 0;
+
+    // Crop all survey points to the visible range
+    let results3D = results.filter(r => r.tvd >= startTvd3D - 0.5);
+
+    // Insert an interpolated start point at exactly startTvd3D
+    if (kopSurv && results3D.length > 0 && Math.abs(results3D[0].tvd - startTvd3D) > 1) {
+        const startMd = findMdAtTvd(results, startTvd3D);
+        if (startMd !== null) {
+            const startPt = interpolateAtMD(results, startMd);
+            if (startPt) {
+                startPt.vsDep  = vsDep(startPt.northing, startPt.easting, vsAzRad);
+                startPt.radDep = Math.sqrt(startPt.northing**2 + startPt.easting**2);
+                results3D.unshift({ ...startPt, marker: null });
+            }
+        }
+    }
+
+    // Wellpath trace — uses the cropped dataset
+    const trace3D = { type:'scatter3d', mode:'lines+markers',
+        x:results3D.map(p=>p.easting), y:results3D.map(p=>p.northing), z:results3D.map(p=>p.tvd),
+        line:{width:5,color:'#e74c3c'}, marker:{size:2,color:'#2c3e50'}, name:'Wellpath',
+        hovertemplate:'E: %{x:.1f}<br>N: %{y:.1f}<br>TVD: %{z:.1f}<extra></extra>' };
+
+    // Labeled start marker at the top of the 3D path
+    const trace3DStart = kopSurv && results3D.length > 0 ? {
+        type:'scatter3d', mode:'markers+text',
+        x:[results3D[0].easting], y:[results3D[0].northing], z:[results3D[0].tvd],
+        marker:{size:8, color:'#0d9488', symbol:'circle', line:{color:'white',width:1.5}},
+        text:['50 m above KOP'], textposition:'top center',
+        textfont:{size:11, color:'#0d9488'}, name:'3D Start (50 m above KOP)',
+        hovertemplate:'3D view start<br>TVD: %{z:.1f} m<extra></extra>'
+    } : null;
+
+    // Key-point markers — filtered to the visible range
+    const d3MarkerPts3D = d3MarkerPts.filter(p => p.tvd >= startTvd3D - 0.5);
+    const trace3DKeys = d3MarkerPts3D.length ? { type:'scatter3d', mode:'markers+text',
+        x:d3MarkerPts3D.map(p=>p.easting), y:d3MarkerPts3D.map(p=>p.northing), z:d3MarkerPts3D.map(p=>p.tvd),
+        marker:{size:6,color:'#e67e22',symbol:'diamond'},
+        text:d3MarkerPts3D.map(p=>`${p.marker}<br>@ ${p.tvd.toFixed(0)} m TVD`),
+        textposition:'top center', textfont:{size:10,color:'#2c3e50'}, name:'Key Points',
+        hovertemplate:'%{text}<extra></extra>' } : null;
+
+    // Formation markers — filtered to the visible range
+    const fm3DItems3D = fm3DItems.filter(p => p.tvd >= startTvd3D - 0.5);
+    const trace3DFm = fm3DItems3D.length ? { type:'scatter3d', mode:'markers+text',
+        x:fm3DItems3D.map(p=>p.easting), y:fm3DItems3D.map(p=>p.northing), z:fm3DItems3D.map(p=>p.tvd),
+        marker:{size:7,color:fm3DItems3D.map(p=>p.fmColor),symbol:'circle'},
+        text:fm3DItems3D.map(p=>`${p.fmName}<br>@ ${p.tvd.toFixed(0)} m TVD`),
+        textposition:'top center', textfont:{size:9}, name:'Formations',
+        hovertemplate:'%{text}<extra></extra>' } : null;
+
+    // Formation meshes still use the full results for spatial bounds
+    const fm3D = buildFormation3DTraces(results);
+
+    const all3D = [trace3D, ...fm3D];
+    if (trace3DStart) all3D.push(trace3DStart);
+    if (trace3DKeys) all3D.push(trace3DKeys);
+    if (trace3DFm) all3D.push(trace3DFm);
+
+    Plotly.react('plot3d', all3D, {
+        scene:{ xaxis:{title:'Easting (m)'}, yaxis:{title:'Northing (m)'},
+            zaxis:{title:'TVD (m)',autorange:'reversed'},
+            camera:{eye:{x:1.5,y:1.5,z:0.8}}, aspectmode:'auto',
+            bgcolor:'#fafbfc', uirevision: plotRevision },
+        margin:{l:0,r:0,t:30,b:0}, legend:{orientation:'h',y:-0.05},
+        paper_bgcolor:'white', uirevision: plotRevision
+    }, {responsive:true});
+}
+
+/* =============  TABLE  ============= */
+function resampleSurvey(results, step, vsAzRad) {
+    if (!results || !results.length) return [];
+
+    const fmRows = [];
+    formations.forEach(f => {
+        let mdT; if (f.depthType === 'MD') mdT = f.depth; else mdT = findMdAtTvd(results, f.depth);
+        if (mdT === null) return;
+        const ip = interpolateAtMD(results, mdT);
+        if (!ip) return;
+        ip.vsDep  = vsDep(ip.northing, ip.easting, vsAzRad);
+        ip.radDep = Math.sqrt(ip.northing ** 2 + ip.easting ** 2);
+        fmRows.push({ ...ip, marker: "Top " + f.name, isFm: true, fmColor: f.color });
+    });
+
+    if (!step || step <= 0) {
+        const allRows = results.map(r => ({ ...r, isFm: false })).concat(fmRows);
+        allRows.sort((a, b) => a.md - b.md);
+        return allRows;
+    }
+
+    const markerRows = results
+        .filter(r => r.marker && r.marker.length)
+        .map(r => ({ ...r, isFm: false }));
+    const markerMDs = markerRows.map(r => r.md);
+
+    const maxMd = results[results.length - 1].md;
+    const steppedRows = [];
+    for (let m = 0; m <= maxMd + 1e-6; m += step) {
+        const mdT = Math.min(m, maxMd);
+        if (markerMDs.some(mm => Math.abs(mm - mdT) < 0.1)) continue;
+        const ip = interpolateAtMD(results, mdT);
+        if (!ip) continue;
+        ip.vsDep  = vsDep(ip.northing, ip.easting, vsAzRad);
+        ip.radDep = Math.sqrt(ip.northing ** 2 + ip.easting ** 2);
+        steppedRows.push({ ...ip, marker: null, isFm: false });
+    }
+
+    const all = steppedRows.concat(markerRows).concat(fmRows);
+    all.sort((a, b) => a.md - b.md);
+
+    const dedup = [];
+    for (const row of all) {
+        const prev = dedup[dedup.length - 1];
+        if (prev && Math.abs(prev.md - row.md) < 0.05) {
+            if (!prev.marker && row.marker) dedup[dedup.length - 1] = row;
+        } else {
+            dedup.push(row);
+        }
+    }
+    return dedup;
+}
+
+function onMdStepChange(val) {
+    mdStep = parseFloat(val) || 0;
+    if (lastCalcResults.length) {
+        const vsAzRad = (parseFloat(document.getElementById('vsAzimuth').value) || 0) * degToRad;
+        renderTable(lastCalcResults, vsAzRad);
+    }
+}
+
+function renderTable(results, vsAzRad) {
+    const allRows = resampleSurvey(results, mdStep, vsAzRad);
+    const fmCount     = allRows.filter(r => r.isFm).length;
+    const markerCount = allRows.filter(r => !r.isFm && r.marker).length;
+
+    let html = `<table><thead><tr>
+        <th>Marker</th><th>MD (m)</th><th>TVD (m)</th><th>Inc (deg)</th><th>Azi (deg)</th>
+        <th>DLS (deg/30m)</th><th>North (m)</th><th>East (m)</th>
+        <th>VS-Dep (m)</th><th>H-Dep (m)</th></tr></thead><tbody>`;
+
+    allRows.forEach(row => {
+        const isFm = row.isFm;
+        let markerHtml = '';
+        if (row.marker) {
+            if (isFm) {
+                markerHtml = `<span class="marker marker-fm" style="background-color:${row.fmColor || '#8e44ad'}">${row.marker}</span>`;
+            } else {
+                let cls = 'marker';
+                if (row.marker === 'KOP') cls += ' marker-kop';
+                else if (row.marker === 'EOB') cls += ' marker-eob';
+                else if (row.marker === 'EOD') cls += ' marker-eod';
+                else if (row.marker === 'EOT') cls += ' marker-eot';
+                else if (row.marker === 'SOT') cls += ' marker-sot';
+                else if (row.marker === 'TD') cls += ' marker-td';
+                else if (row.marker === 'SURFACE') cls += ' marker-surface';
+                markerHtml = `<span class="${cls}">${row.marker}</span>`;
+            }
+        }
+        const trClass = isFm ? ' class="fm-row"' : '';
+        html += `<tr${trClass}>
+            <td>${markerHtml}</td>
+            <td>${row.md.toFixed(2)}</td>
+            <td>${row.tvd.toFixed(2)}</td>
+            <td>${row.inc.toFixed(2)}</td>
+            <td>${row.azi.toFixed(2)}</td>
+            <td>${row.dls.toFixed(2)}</td>
+            <td>${row.northing.toFixed(2)}</td>
+            <td>${row.easting.toFixed(2)}</td>
+            <td>${row.vsDep.toFixed(2)}</td>
+            <td>${row.radDep.toFixed(2)}</td>
+        </tr>`;
+    });
+
+    html += `</tbody></table>`;
+    document.getElementById('survey-table').innerHTML = html;
+    const stepTxt = mdStep > 0 ? `@ ${mdStep} m step` : 'raw stations';
+    document.getElementById('tableInfo').textContent =
+        `${allRows.length} rows ${stepTxt} | ${markerCount} marker${markerCount===1?'':'s'} | ${fmCount} formation top${fmCount===1?'':'s'} | TD = ${results[results.length-1].md.toFixed(1)} m MD`;
+}
+
+/* =============  EXPORTS  ============= */
+function exportPlot(divId, filename) {
+    Plotly.downloadImage(divId, { format: 'png', width: 1200, height: 900, scale: 3, filename: filename });
+}
+
+function exportExcel() {
+    if (lastCalcResults.length === 0) return alert("Calculate the plan first!");
+    const vsAzRad = lastVsAz * degToRad;
+
+    const rows = resampleSurvey(lastCalcResults, mdStep, vsAzRad);
+    const data = rows.map(r => ({
+        Marker: r.marker || '',
+        'MD (m)':        +r.md.toFixed(2),
+        'TVD (m)':       +r.tvd.toFixed(2),
+        'Inc (deg)':     +r.inc.toFixed(2),
+        'Azi (deg)':     +r.azi.toFixed(2),
+        'DLS (deg/30m)': +r.dls.toFixed(2),
+        'Northing (m)':  +r.northing.toFixed(2),
+        'Easting (m)':   +r.easting.toFixed(2),
+        'VS-Dep (m)':    +r.vsDep.toFixed(2),
+        'H-Departure (m)': +r.radDep.toFixed(2)
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    const sheetName = mdStep > 0 ? `Well Plan (${mdStep}m)` : 'Well Plan (raw)';
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+    if (formations.length > 0) {
+        const fmData = formations.map(f => ({
+            Name: f.name, Depth: f.depth, Type: f.depthType,
+            'Dip (deg)': f.dip, 'Strike (deg)': f.strike
+        }));
+        const wsFm = XLSX.utils.json_to_sheet(fmData);
+        XLSX.utils.book_append_sheet(wb, wsFm, "Formation Tops");
+    }
+
+    XLSX.writeFile(wb, `${wellName.replace(/[^a-z0-9_-]/gi,'_')}_Well_Plan.xlsx`);
+}
+
+async function captureCleanPlot(sourceDivId, w, h) {
+    const sourceDiv = document.getElementById(sourceDivId);
+    if (!sourceDiv || !sourceDiv.data) return null;
+
+    const tmpId = `_tmp_${sourceDivId}_${Date.now()}`;
+    const div = document.createElement('div');
+    div.id = tmpId;
+    div.style.cssText = `position:absolute;left:-9999px;top:0;width:${w}px;height:${h}px;`;
+    document.body.appendChild(div);
+
+    const data = JSON.parse(JSON.stringify(sourceDiv.data));
+    const layout = JSON.parse(JSON.stringify(sourceDiv.layout));
+    layout.width = w; layout.height = h;
+    layout.font = { size: 12 };
+
+    if (layout.annotations && layout.annotations.length) {
+        const items = layout.annotations.map(a => ({
+            x: a.x, y: a.y, text: a.text,
+            color: (a.bordercolor && a.bordercolor !== '#999') ? a.bordercolor : null
+        }));
+        layout.annotations = spreadAnnotations(items, {
+            baseAx: 70, baseAy: -55, layerAx: 32, layerAy: 32, minSep: 0.06
+        });
+    }
+
+    await Plotly.newPlot(tmpId, data, layout, { displayModeBar:false });
+    const img = await Plotly.toImage(tmpId, { format:'png', width:w, height:h, scale: 3 });
+    Plotly.purge(tmpId);
+    div.remove();
+    return img;
+}
+
+async function exportPDF() {
+    if (lastCalcResults.length === 0) return alert("Calculate the plan first!");
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('l', 'mm', 'a4');
+
+    doc.setFontSize(18);
+    doc.text(`Directional Well Plan — ${wellName}`, 14, 15);
+    doc.setFontSize(10);
+    const today = new Date().toISOString().slice(0, 10);
+    doc.text(`Date: ${today}   |   VS Azimuth: ${lastVsAz.toFixed(2)} deg   |   Formations: ${formations.length}`, 14, 22);
+
+    const imgPlan = await captureCleanPlot('plot2dPlan', 1100, 800);
+    const imgVS   = await captureCleanPlot('plot2dVS',   1100, 800);
+
+    if (imgPlan) doc.addImage(imgPlan, 'PNG', 10,  26, 130, 90, undefined, 'FAST');
+    if (imgVS)   doc.addImage(imgVS,   'PNG', 150, 26, 130, 90, undefined, 'FAST');
+
+    const img3D = await captureCleanPlot('plot3d', 1400, 900);
+
+    const tableBody = [];
+    const allRows = lastCalcResults.map(r => ({...r, isFm:false}));
+    formations.forEach(f => {
+        let mdT; if (f.depthType === 'MD') mdT = f.depth; else mdT = findMdAtTvd(lastCalcResults, f.depth);
+        if (mdT !== null) {
+            const ip = interpolateAtMD(lastCalcResults, mdT);
+            if (ip) {
+                const vsAzRad = lastVsAz * degToRad;
+                allRows.push({
+                    md: ip.md, tvd: ip.tvd, inc: ip.inc, azi: ip.azi, dls: ip.dls,
+                    northing: ip.northing, easting: ip.easting,
+                    vsDep: vsDep(ip.northing, ip.easting, vsAzRad),
+                    radDep: Math.sqrt(ip.northing ** 2 + ip.easting ** 2),
+                    marker: "Top " + f.name, isFm: true, fmColor: f.color
+                });
+            }
+        }
+    });
+    allRows.sort((a, b) => a.md - b.md);
+
+    allRows.forEach(r => {
+        tableBody.push([
+            r.marker || '', r.md.toFixed(2), r.tvd.toFixed(2),
+            r.inc.toFixed(2), r.azi.toFixed(2),
+            r.dls.toFixed(2), r.northing.toFixed(2), r.easting.toFixed(2),
+            r.vsDep.toFixed(2), r.radDep.toFixed(2)
+        ]);
+    });
+
+    doc.autoTable({
+        startY: 120,
+        head: [['Marker', 'MD', 'TVD', 'Inc', 'Azi', 'DLS', 'North', 'East', 'VS-Dep', 'H-Dep']],
+        body: tableBody,
+        theme: 'grid',
+        headStyles: { fillColor: [27, 40, 56] },
+        styles: { fontSize: 7, cellPadding: 1.5 },
+        didParseCell: (data) => {
+            if (data.section === 'body' && data.column.index === 0 && data.cell.raw && data.cell.raw.startsWith('Top ')) {
+                data.cell.styles.fillColor = [253, 246, 255];
+                data.cell.styles.fontStyle = 'bold';
+                data.cell.styles.textColor = [142, 68, 173];
+            }
+        }
+    });
+
+    if (img3D) {
+        doc.addPage();
+        doc.setFontSize(14);
+        doc.text(`3D Well Path — ${wellName}`, 14, 15);
+        doc.addImage(img3D, 'PNG', 10, 22, 277, 175, undefined, 'FAST');
+    }
+
+    if (formations.length > 0) {
+        doc.addPage();
+        doc.setFontSize(14);
+        doc.text("Formation Tops", 14, 15);
+        doc.autoTable({
+            startY: 22,
+            head: [['Name', 'Depth', 'Type', 'Dip (deg)', 'Strike (deg)']],
+            body: formations.map(f => [f.name, f.depth, f.depthType, f.dip, f.strike]),
+            theme: 'grid',
+            headStyles: { fillColor: [142, 68, 173] }
+        });
+    }
+
+    doc.addPage();
+    doc.setFontSize(14);
+    doc.text("Annotation Display Settings", 14, 15);
+    const annBody = ANN_MARKERS.map(m => [
+        m.label,
+        reportOptions.plan[m.key] ? '✓' : '—',
+        reportOptions.vs[m.key] ? '✓' : '—',
+        reportOptions.d3[m.key] ? '✓' : '—'
+    ]);
+    doc.autoTable({
+        startY: 22,
+        head: [['Marker', 'Plan View', 'Vertical Section', '3D']],
+        body: annBody,
+        theme: 'grid',
+        headStyles: { fillColor: [55, 71, 79] },
+        styles: { halign: 'center' },
+        columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } }
+    });
+
+    if (currentSolution) {
+        doc.addPage();
+        doc.setFontSize(14);
+        doc.text("Target Solver Summary", 14, 15);
+        doc.setFontSize(10);
+        const s = currentSolution, p = lastPareto;
+        const targetARaw = document.getElementById('solverTargetAlpha').value.trim();
+        const targetHRaw = document.getElementById('solverTargetH').value.trim();
+        const aVal = targetARaw === '' ? null : parseFloat(targetARaw);
+        const hVal = targetHRaw === '' ? null : parseFloat(targetHRaw);
+        let modeLine;
+        if (aVal !== null && !isNaN(aVal)) {
+            modeLine = `Solver mode:          Target Inclination (α = ${aVal.toFixed(2)}°)`;
+        } else if (hVal !== null && !isNaN(hVal) && hVal > 0) {
+            modeLine = `Solver mode:          Target H-Dep (H = ${hVal.toFixed(2)} m, bisected)`;
+        } else {
+            modeLine = `Solver mode:          Auto-knee (Pareto balanced)`;
+        }
+        const lines = [
+            `Well name:            ${wellName}`,
+            `KOP MD:               ${p.kop.toFixed(2)} m`,
+            `Azimuth:              ${p.azi.toFixed(2)} deg`,
+            `EOB TVD (top tgt):    ${p.eobTvd.toFixed(2)} m`,
+            `TD TVD (bottom tgt):  ${p.tdTvd.toFixed(2)} m`,
+            modeLine,
+            ``,
+            `Selected Inclination: ${s.alpha.toFixed(3)} deg`,
+            `Build Rate (DLS):     ${s.dls.toFixed(3)} deg/30m`,
+            `Build Arc Length:     ${s.arc.toFixed(2)} m`,
+            `Hold Length:          ${s.lHold.toFixed(2)} m`,
+            `H-Departure at TD:    ${s.hTotal.toFixed(2)} m  (build ${s.hBuild.toFixed(1)} + hold ${s.hHold.toFixed(1)})`
+        ];
+        lines.forEach((l, i) => doc.text(l, 14, 26 + i*6));
+
+        const profileSegs = segments.filter(s => (s.type==='build'||s.type==='drop') && s.params.profileEnabled);
+        if (profileSegs.length > 0) {
+            const yStart = 26 + lines.length * 6 + 8;
+            doc.setFontSize(12);
+            doc.text("Realistic DLS Profile (applied)", 14, yStart);
+            doc.setFontSize(10);
+            profileSegs.forEach((seg, i) => {
+                const idx = segments.indexOf(seg) + 1;
+                const pp = seg.params;
+                const line = `Segment ${idx} (${seg.type.toUpperCase()}):  ramp-up ${(pp.fUp*100).toFixed(0)}%, ramp-down ${(pp.fDown*100).toFixed(0)}%, end-DLS ${(pp.kMin*100).toFixed(0)}% of nominal ${pp.rate.toFixed(2)} deg/30m → target ${pp.targetInc.toFixed(1)}°`;
+                doc.text(line, 14, yStart + 6 + i*6);
+            });
+        }
+    }
+
+    /* ============================================================
+       PDF COPYRIGHT PAGE
+       ============================================================ */
+    doc.addPage();
+    doc.setFontSize(16);
+    doc.setTextColor(13, 148, 136);
+    doc.text("Directional Well Planner", 14, 20);
+    doc.setFontSize(10);
+    doc.setTextColor(30, 41, 59);
+    doc.text(`© ${new Date().getFullYear()} Ismail Harkat. All rights reserved.`, 14, 30);
+    doc.text("Contact: geoharkat@gmail.com", 14, 38);
+    doc.text("License: MIT — https://opensource.org/licenses/MIT", 14, 46);
+    doc.text("", 14, 56);
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    const disclaimer = [
+        "DISCLAIMER: This software is provided \"as is\", without warranty of any kind, express or implied.",
+        "In no event shall the author be liable for any claim, damages, or other liability arising from the use",
+        "of this software. The user assumes all responsibility for verifying well plans against operational",
+        "requirements, regulatory standards, and field conditions. This tool is intended for educational and",
+        "preliminary planning purposes only — it does not replace professional drilling engineering judgment."
+    ];
+    disclaimer.forEach((line, i) => doc.text(line, 14, 62 + i * 5));
+
+    doc.save(`${wellName.replace(/[^a-z0-9_-]/gi,'_')}_Well_Plan_Report.pdf`);
+}
+
+/* =============  INITIALIZATION  ============= */
+window.onload = () => {
+    document.getElementById('solverKOP').value    = 500;
+    document.getElementById('solverAzi').value    = 45;
+    document.getElementById('solverEobTvd').value = 2000;
+    document.getElementById('solverTdTvd').value  = 2500;
+
+    formations.push({
+        id: formationIdCounter++, name: 'Hamra Quartzite', depth: 1800, depthType: 'TVD',
+        dip: 0, strike: 0, color: '#8e44ad'
+    });
+    formations.push({
+        id: formationIdCounter++, name: 'Reservoir Top', depth: 2050, depthType: 'TVD',
+        dip: 3, strike: 45, color: '#16a085'
+    });
+    formations.push({
+        id: formationIdCounter++, name: 'Reservoir Base', depth: 2400, depthType: 'TVD',
+        dip: 3, strike: 45, color: '#d35400'
+    });
+    renderFormations();
+    renderAnnotationTable();
+
+    /* Populate dynamic year in footer and sidebar */
+    const year = new Date().getFullYear();
+    document.getElementById('copyYear').textContent = year;
+    document.getElementById('footerYear').textContent = year;
+
+    solveAndGenerate();
+};
+</script>
+
+</body>
+</html>
