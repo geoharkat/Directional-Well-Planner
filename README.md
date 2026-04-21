@@ -1,4 +1,3 @@
-```markdown
 # 🧭 Advanced Directional Well Planner
 
 A powerful, privacy-first web application for designing, visualizing, and exporting directional well trajectories. Built specifically for drilling engineers, well planners, and geologists to rapidly iterate on well profiles using an integrated Pareto solver, realistic DLS ramp modeling, and 3D formation intersections — entirely within the browser.
@@ -83,4 +82,4 @@ If you find this tool useful in your drilling engineering or geological workflow
 ## 📄 License
 
 This project is licensed under the MIT License — see the LICENSE file for details.
-```
+
