@@ -14,58 +14,79 @@ A powerful, privacy-first web application for designing, visualizing, and export
 
 ## ✨ Key Features
 
-- **100% Client-Side** — Runs entirely in your browser. Your proprietary well data and geological interpretations are never uploaded to any server.
-- **Pareto Target Solver** — Instantly find the optimal build rate and inclination to hit your target. Generates a full Pareto curve (Min DLS vs. Max Reach), auto-detects the "Knee" point, and allows fine-tuning via a slider or exact target inputs (Inclination or Horizontal Departure).
-- **Realistic DLS Profiles** — Model real-world BHA behavior with trapezoidal rate profiles (ramp-up / ramp-down) on build/drop segments. The planner automatically extends the segment length so the target inclination is still hit exactly.
-- **Advanced Formation Tops** — Input formation tops as TVD or MD, with Dip and Strike. The planner calculates apparent dip in the Vertical Section plane and renders dipping planes as 3D meshes and 2D lines with volume fill.
-- **Minimum Curvature Method** — Industry-standard survey calculation algorithm used for all trajectory computations.
-- **3D Well Path (Cropped View)** — The 3D view starts 50m above the KOP, removing the uninformative vertical section and focusing the camera on the directional geometry. A labeled marker indicates the 3D start point.
-- **Interactive 3-Window Plots** — Synchronized Plan View, Vertical Section, and 3D well path with spread-out, non-overlapping annotations for KOP, EOB, EOD, TD, etc.
-- **Customizable Annotations** — Toggle which markers (KOP, EOB, Formations, Wellhead) appear on each specific plot (Plan, VS, 3D) and in the PDF report.
-- **Professional Exports** — Export high-resolution PNGs of any plot, a fully formatted Excel survey (with selectable MD step), or a multi-page PDF report complete with plots, survey tables, solver summary, and copyright/disclaimer.
+- **100% Client-Side** — Calculations and rendering run in your browser. Your well data is never uploaded. (The page loads its open-source libraries from public CDNs.)
+- **Metric or Field Units** — Switch between m with deg/30m and ft with deg/100ft at any time. Values are held at full precision internally, so switching back and forth never changes the well. Your choice is remembered.
+- **Pareto Target Solver** — Build-and-hold solver with a Min DLS / Max Reach curve, automatic knee point within a maximum inclination you set, click-to-select on the curve, and exact modes for target inclination or horizontal departure.
+- **Realistic DLS Profiles** — Trapezoidal ramp-up / ramp-down on build and drop segments. The segment is lengthened so the target inclination is still reached exactly.
+- **Formation Tops** — TVD or MD input with dip and strike. Each pick is where the well path actually crosses the dipping plane, with apparent dip on the vertical section.
+- **D3.js Visualisations** — Plan view, vertical section (true 1:1 or stretched), rotatable 3D view, and inclination / azimuth / dogleg profiles against MD, with hover read-outs, zoom and pan.
+- **Customisable Annotations** — Choose which markers are labelled on the Plan, Vertical Section and 3D views.
+- **Output Files** — PDF report with vector plots, Excel workbook, CSV survey, and PNG or SVG of every plot.
 
 ---
 
 ## 🚀 How to Use
 
-1. **Open the App** — Navigate to the live app or open `index.html` in any modern web browser.
+1. **Open the app** — Use the live link, or open `index.html` in a modern browser.
+2. **Pick units** — Metric (m) or Field (ft), in the header.
+3. **Solve the target** *(optional)* — Enter the kick-off depth, TVD targets and azimuth, then **Compute & Generate**. Optionally give a target inclination or departure.
+4. **Adjust segments** — Edit the generated Vertical / Build / Hold segments or add Drop and Turn segments. Leave a build or drop azimuth blank to keep the current direction. Problems with a segment are reported next to it.
+5. **Add formation tops** — Enter depth, dip and strike (right-hand rule).
+6. **Configure the view** — Set the vertical section azimuth, annotations, and the survey MD step.
+7. **Export** — Fill in Operator / Field / Prepared by if wanted, then use **CSV**, **Excel** or **PDF report** in the header, or **SVG** / **PNG** on any plot.
 
-2. **Solve the Target (Optional but Recommended)** — In the "Target Solver" panel, enter your KOP MD, Target TVDs, and Azimuth. Click Compute & Generate to instantly build a balanced well plan based on the Pareto Knee point, or specify a target inclination/horizontal departure.
-
-3. **Adjust Segments** — Modify the generated segments (Vertical, Build, Hold) or add your own (Drop, Turn). Use the sliders for Build Rate and Target Inclination. Enable Realistic DLS Profile if you need ramp-up/ramp-down behavior.
-
-4. **Add Formation Tops** — Click + Add Formation Top. Enter Depth (TVD or MD), Dip, and Strike. Formations will appear as dashed/solid lines in the VS plot and as 3D planes in the 3D view.
-
-5. **Configure View** — Set the Vertical Section Azimuth (or use Auto), adjust annotation toggles, and set your preferred MD step for the survey table.
-
-6. **Export** — Use the top-right buttons to export the Survey Table to Excel or generate a comprehensive PDF Report. Use the "PNG" buttons on individual plots for high-res images.
+Plot controls: drag to pan (rotate in 3D), `Ctrl` + scroll to zoom, double-click to reset.
 
 ---
 
-## 📐 Supported Well Profiles & Calculations
+## 📦 Output Files
+
+| File | Contents |
+|------|----------|
+| **PDF report** | Well summary and key figures, directional program, key survey points, warnings, plan view, vertical section, 3D view, directional profiles, formation prognosis, solver summary, survey listing at the selected MD step, disclaimer |
+| **Excel (.xlsx)** | Sheets: Summary, Survey, Directional Program, Formation Tops, Target Solver |
+| **CSV** | Survey table at the selected MD step, in the selected units |
+| **PNG / SVG** | Any plot, with title, units and date |
+
+The built-in PDF fonts cover Western European characters only. Other characters in names are transliterated or shown as `?` in the PDF; Excel, CSV and plot images keep them.
+
+---
+
+## 📐 Calculations & Conventions
 
 | Feature | Details |
 |--------|--------|
-| **Well Types** | J-Type (Build & Hold), S-Type (Build, Hold, Drop), Horizontal (Build to 90° & Hold), Custom multi-segment |
-| **Survey Calculation** | Minimum Curvature Method (standard ratio factor) |
-| **Build/Drop Rate** | Constant DLS or Trapezoidal Profile (Ramp Up → Hold → Ramp Down) |
-| **Turn Segment** | Azimuthal turning at constant turn rate while maintaining inclination |
-| **Solver Modes** | Auto-Knee (Pareto balanced), Target Inclination, Target Horizontal Departure (bisection) |
-| **Formation Projection** | 3D plane intersection, Apparent Dip calculation for VS projection |
-| **3D View Start** | Cropped 50m above KOP for optimal camera focus on directional section |
+| **Survey calculation** | Minimum curvature. Positions between stations are interpolated along the same arc. |
+| **Depth reference** | Surface / wellhead = 0. Azimuth clockwise from north. |
+| **Build / drop** | Constant DLS or trapezoidal profile. If the azimuth changes while the hole is inclined, the change is spread evenly along the segment and the resulting DLS is reported. |
+| **Turn** | Azimuth change at constant turn rate and constant inclination, taking the shortest direction. |
+| **Vertical** | Only valid while the hole is vertical; add a Drop to 0° first otherwise. |
+| **Solver** | Auto-knee (maximum distance from the chord, up to the chosen maximum inclination), target inclination, or target departure (bisection). |
+| **Formation tops** | Plane from depth, dip and strike. TVD input: plane at that depth below the wellhead. MD input: plane through the well at that depth. |
+| **Units** | 1 ft = 0.3048 m exactly; deg/100ft = deg/30m × 1.016. |
+
+This tool is for preliminary planning. It does not perform anti-collision, torque-and-drag or hydraulics analysis, and it does not apply magnetic or grid corrections.
 
 ---
 
 ## 🛠️ Tech Stack
 
-This is a zero-build, single-file web application leveraging powerful open-source libraries:
+A zero-build, single-file web application:
 
 | Library | Purpose |
 |--------|--------|
-| Plotly.js | 2D (Plan, VS) & 3D Interactive Plotting |
-| SheetJS (XLSX) | Excel (.xlsx) Survey Export |
-| jsPDF + AutoTable | PDF Report Generation |
-| Vanilla JS / CSS | Core Logic, UI, & Styling (No framework dependencies) |
+| D3.js | Plan, vertical section, 3D, profile and Pareto plots |
+| SheetJS (XLSX) | Excel export |
+| jsPDF + AutoTable + svg2pdf.js | PDF report with vector plots |
+| Vanilla JS / CSS | Core logic and UI |
+
+### Tests
+
+The calculation core in `index.html` is covered by unit tests (Node.js 18+, no packages to install):
+
+```bash
+node --test tests/core.test.js
+```
 
 ---
 
