@@ -62,7 +62,7 @@ The built-in PDF fonts cover Western European characters only. Other characters 
 | **Turn** | Azimuth change at constant turn rate and constant inclination, taking the shortest direction. |
 | **Vertical** | Only valid while the hole is vertical; add a Drop to 0° first otherwise. |
 | **Solver** | Auto-knee (maximum distance from the chord, up to the chosen maximum inclination), target inclination, or target departure (bisection). |
-| **Formation tops** | Plane from depth, dip and strike. TVD input: plane at that depth below the wellhead. MD input: plane through the well at that depth. |
+| **Formation tops** | Plane from depth, dip and strike. TVD input: plane at that depth below the wellhead. MD input: plane through the well at that depth. On the vertical section each horizon is drawn along the well track, so picks sit on it even when the well turns. |
 | **Units** | 1 ft = 0.3048 m exactly; deg/100ft = deg/30m × 1.016. |
 
 This tool is for preliminary planning. It does not perform anti-collision, torque-and-drag or hydraulics analysis, and it does not apply magnetic or grid corrections.

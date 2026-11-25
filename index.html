@@ -825,7 +825,7 @@
         <span id="footerYear"></span>
     </div>
     <div class="footer-right">
-        <span class="badge">v2.0</span>
+        <span class="badge">v2.0.1</span>
         <span>Built for drilling engineers</span>
     </div>
 </footer>
@@ -1143,6 +1143,24 @@ const WellCore = (() => {
         return { ...f, dip, strike, dipDir, N0, E0, TVD0, tvdAt, tvdAtVs, planeValid:true, pick, apparentDip };
     }
 
+    /* Trace of a formation plane on the vertical section: the plane's TVD under every point of
+       the well track, plotted at that point's section departure, so each pick lies on its
+       horizon even when the well turns away from the section line. Beyond both ends of the
+       track the trace continues along the section azimuth to the limits vsMin and vsMax.    */
+    function horizonSection(f, path, vsAzDeg, vsMin, vsMax) {
+        const c = Math.cos(vsAzDeg * DEG), s = Math.sin(vsAzDeg * DEG);
+        const at = (n, e) => ({ vs:vsDeparture(n, e, vsAzDeg), tvd:f.tvdAt(n, e) });
+        if (!path.length) return [at(vsMin * c, vsMin * s), at(vsMax * c, vsMax * s)];
+        const track = f.pick ? [...path, f.pick].sort((a, b) => a.md - b.md) : path;
+        const first = track[0], last = track[track.length - 1];
+        const heading = at(last.northing, last.easting).vs - at(first.northing, first.easting).vs >= -1e-6 ? 1 : -1;
+        const extend = (p, side) => {
+            const run = (side > 0 ? vsMax : vsMin) - at(p.northing, p.easting).vs;
+            return run * side > 0 ? [at(p.northing + run * c, p.easting + run * s)] : [];
+        };
+        return [...extend(first, -heading), ...track.map(p => at(p.northing, p.easting)), ...extend(last, heading)];
+    }
+
     /* ---------------- Survey table ---------------- */
     function resampleSurvey(results, stepM, formations, vsAzDeg) {
         if (!results || !results.length) return [];
@@ -1229,7 +1247,7 @@ const WellCore = (() => {
     return { DEG, RAD, M_PER_FT, UNITS, toLen, fromLen, toDls, fromDls, normAz, shortestTurn, clamp,
              profileParams, buildLength, buildFraction, buildPlan, minimumCurvature, interpolateAtMD,
              firstCrossing, findMdAtTvd, vsDeparture, withDepartures, densify, computeWell,
-             resolveFormation, resampleSurvey, rowLabel, summarize,
+             resolveFormation, horizonSection, resampleSurvey, rowLabel, summarize,
              solutionFromAlpha, buildParetoCurve, reachRange, findAlphaForTargetH };
 })();
 if (typeof globalThis !== 'undefined') globalThis.WellCore = WellCore;
@@ -1513,8 +1531,7 @@ const Charts = (() => {
         const g = base(node, o), U = WellCore.UNITS[m.units], L = v => WellCore.toLen(v, m.units), M = v => WellCore.fromLen(v, m.units);
         const planes = m.formations.filter(f => f.planeValid);
         const legend = [{ type:'line', color:INK.path, label:'Well path' }];
-        planes.forEach(f => legend.push({ type:'line', color:f.color,
-            label:`${f.name} (app. dip ${fmt(f.apparentDip, 1)}°)` }));
+        planes.forEach(f => legend.push({ type:'line', color:f.color, label:`${f.name} (dip ${fmt(f.dip, 1)}°)` }));
         const top = titleBlock(g, o);
         const ll = legendLayout(legend, o.width - 76, o);
         const box = { x:64, y:top, w:o.width - 80, h:o.height - top - 42 - ll.height };
@@ -1533,23 +1550,32 @@ const Charts = (() => {
         let y = d3.scaleLinear(yd, [box.y, box.y + box.h]);
         const t = o.interactive && node.__transform;
         if (t) { x = t.rescaleX(x); y = t.rescaleY(y); }
-        axes(g, o, x, y, box, `Vertical section departure (${U.len})${m.trueScale ? '   [1:1 scale]' : ''}`, `TVD (${U.len})`);
+        const notes = [m.trueScale ? '1:1 scale' : '', planes.some(f => f.dip > 0) ? 'horizons follow the well track' : ''].filter(Boolean);
+        axes(g, o, x, y, box, `Vertical section departure (${U.len})${notes.length ? `   [${notes.join(', ')}]` : ''}`, `TVD (${U.len})`);
 
         const inner = clip(g, box.x, box.y, box.w, box.h);
         const [x0, x1] = x.domain();
-        const ends = f => [[x(x0), y(L(f.tvdAtVs(M(x0))))], [x(x1), y(L(f.tvdAtVs(M(x1))))]];
+        const traces = new Map(planes.map(f => [f, WellCore.horizonSection(f, m.dense, m.vsAz, M(x0), M(x1))
+            .map(p => [x(L(p.vs)), y(L(p.tvd))])]));
         const sorted = [...planes].sort((a, b) => a.tvdAtVs(0) - b.tvdAtVs(0));
         if (m.fill) for (let i = 0; i < sorted.length - 1; i++) {
-            const a = ends(sorted[i]), b = ends(sorted[i + 1]);
-            inner.append('path').attr('d', pathD([a[0], a[1], b[1], b[0]]) + 'Z')
+            const a = traces.get(sorted[i]), b = traces.get(sorted[i + 1]);
+            inner.append('path').attr('d', pathD([...a, ...[...b].reverse()]) + 'Z')
                 .attr('fill', sorted[i].color).attr('fill-opacity', 0.13);
         }
         const reserved = [];                       // boxes the point labels must keep clear of
         {
-            sorted.forEach(f => stroke(inner, ends(f), f.color, 1.6));
+            sorted.forEach(f => stroke(inner, traces.get(f), f.color, 1.6));
             /* name at the right-hand end of each boundary, nudged apart when crowded */
             const xr = box.x + box.w - 6;
-            const atRight = f => y(L(f.tvdAtVs(M(x.invert(xr))))) - 4;
+            const atRight = f => {                     // height of the trace where its name is written
+                const pts = traces.get(f);
+                for (let i = pts.length - 1; i > 0; i--) {
+                    const [a, b] = [pts[i - 1], pts[i]];
+                    if (a[0] !== b[0] && (a[0] - xr) * (b[0] - xr) <= 0) return a[1] + (xr - a[0]) / (b[0] - a[0]) * (b[1] - a[1]) - 4;
+                }
+                return Infinity;                       // trace does not reach this edge: no name
+            };
             let prevY = -Infinity;
             [...sorted].sort((a, b) => atRight(a) - atRight(b)).forEach(f => {
                 const yl = Math.max(atRight(f), prevY + 15); prevY = yl;
@@ -2238,7 +2264,7 @@ const Exports = (() => {
 /* =====================================================================
    APPLICATION  (state, UI, wiring)
    ===================================================================== */
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.0.1';
 const C = WellCore;
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));

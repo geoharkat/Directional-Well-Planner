@@ -154,3 +154,23 @@ test('survey resampling gives clean steps in feet and merges coincident rows', (
     assert.strictEqual(C.rowLabel(kop[0]), 'KOP / Top on KOP');
     assert.strictEqual(last(rows).md, last(w.results).md);
 });
+
+test('section horizons pass through their picks on a turning well with dipping tops', () => {
+    const w = run([V(600), B(3, 55, 320), H(450), { id:4, type:'turn', params:{ targetAzi:40, rate:3 } }, H(1300, 5)]);
+    const vsAz = 8.7, dense = C.densify(w.results, 5);
+    for (const depth of [1750, 2050, 2350]) {
+        const f = C.resolveFormation({ name:'x', depth, depthType:'TVD', dip:5, strike:150 }, w.results, vsAz);
+        const trace = C.horizonSection(f, dense, vsAz, -600, 2500);
+        assert.ok(trace.some(p => Math.abs(p.vs - f.pick.vsDep) < 1e-9 && Math.abs(p.tvd - f.pick.tvd) < 1e-6), `pick on horizon ${depth}`);
+        // the straight line along the section azimuth misses the pick: that was the defect
+        assert.ok(Math.abs(f.tvdAtVs(f.pick.vsDep) - f.pick.tvd) > 5);
+        near(Math.min(...trace.map(p => p.vs)), -600, 1e-9);
+        near(Math.max(...trace.map(p => p.vs)), 2500, 1e-9);
+    }
+});
+
+test('section horizons equal the straight plane trace when the well stays on the section', () => {
+    const w = run([V(500), B(3, 40, 45), H(800)]);
+    const f = C.resolveFormation({ name:'x', depth:1200, depthType:'TVD', dip:12, strike:10 }, w.results, 45);
+    C.horizonSection(f, C.densify(w.results, 20), 45, -300, 1500).forEach(p => near(p.tvd, f.tvdAtVs(p.vs), 1e-6));
+});
